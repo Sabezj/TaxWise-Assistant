@@ -57,7 +57,7 @@ pubsub-debug.log
 database-debug.log
 storage-debug.log
 
-# Firebase
-*.firebase*.*
-*firebase*.*
-firebase-export-*
+# Specific Firebase files to ignore (if any, add them here explicitly)
+# For example:
+# firebase-admin-sdk-key.json
+# firebase-export-*.zip
