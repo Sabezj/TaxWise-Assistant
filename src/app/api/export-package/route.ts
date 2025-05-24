@@ -19,7 +19,7 @@ const sampleDocumentStoragePathMap: Record<TaxExportCategory, string | undefined
   property: 'app_resources/sample_documents/property_KND1150117.pdf',
   social: 'app_resources/sample_documents/social_KND1150130.pdf',
   investments: 'app_resources/sample_documents/investments_KND1150145.pdf',
-  general: undefined,
+  general: undefined, // No specific sample for general export for now
 };
 
 // These are the names that will be used INSIDE the ZIP archive for sample documents
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
           console.log(`[API Export] Attempting to fetch user document '${docInfo.filename}' using signed URL.`);
           const response = await fetch(docInfo.signedUrl);
           if (!response.ok) {
-            throw new Error(`Failed to fetch ${docInfo.filename}: ${response.statusText}`);
+            throw new Error(`Failed to fetch ${docInfo.filename}: ${response.statusText} (Status: ${response.status})`);
           }
           const arrayBuffer = await response.arrayBuffer();
           userDocumentsFolder.file(docInfo.filename, arrayBuffer);
@@ -142,6 +142,9 @@ Sample document attempted (path in Firebase Storage): ${sampleDocStoragePath || 
   } catch (error) {
     console.error('[API Export] General error processing export request:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    // Ensure a JSON response even for top-level errors
     return NextResponse.json({ success: false, message: `Server error: ${errorMessage}` }, { status: 500 });
   }
 }
+
+    

@@ -24,39 +24,39 @@ import { enUS, ru } from 'date-fns/locale';
 
 
 const mockHistoryData: TaxHistoryEntry[] = [
-  { 
-    id: "1", 
+  {
+    id: "1",
     date: subMonths(subYears(new Date(), 1), 3).toISOString(), // Approx March 15 last year
-    year: new Date().getFullYear() - 1, 
-    type: "Annual Filing", 
-    status: "Submitted", 
-    summaryFileUrl: "#", 
-    details: { taxableIncome: 75000, deductionsClaimed: 12500, taxLiability: 8000, refundAmount: 500, submissionId: "SUB-2023-Annual-XYZ123", notes: "Standard deduction taken. Included W2 and 1099-INT."} 
+    year: new Date().getFullYear() - 1,
+    type: "Annual Filing",
+    status: "Submitted",
+    summaryFileUrl: "#",
+    details: { taxableIncome: 75000, deductionsClaimed: 12500, taxLiability: 8000, refundAmount: 500, submissionId: "SUB-2023-Annual-XYZ123", notes: "Standard deduction taken. Included W2 and 1099-INT."}
   },
-  { 
-    id: "2", 
+  {
+    id: "2",
     date: subMonths(subYears(new Date(), 1), 9).toISOString(), // Approx Sep 15 last year
-    year: new Date().getFullYear() - 1, 
-    type: "Quarterly Estimate", 
-    status: "Reviewed", 
-    details: { estimatedTaxPaid: 2000, paymentMethod: "Online Bank Transfer", confirmationId: "PAY-Q3-2023-ABC789", notes: "Estimate based on YTD income." } 
+    year: new Date().getFullYear() - 1,
+    type: "Quarterly Estimate",
+    status: "Reviewed",
+    details: { estimatedTaxPaid: 2000, paymentMethod: "Online Bank Transfer", confirmationId: "PAY-Q3-2023-ABC789", notes: "Estimate based on YTD income." }
   },
-  { 
-    id: "3", 
+  {
+    id: "3",
     date: subMonths(subYears(new Date(), 2), 4).toISOString(), // Approx April 10 two years ago
-    year: new Date().getFullYear() - 2, 
-    type: "Annual Filing", 
-    status: "Amended", 
-    summaryFileUrl: "#", 
-    details: { taxableIncome: 72000, originalTaxLiability: 7800, amendedTaxLiability: 7500, reasonForAmendment: "Forgot to include charitable donations.", submissionId: "AMEND-2022-Annual-DEF456", notes: "Amendment resulted in a small additional refund." } 
+    year: new Date().getFullYear() - 2,
+    type: "Annual Filing",
+    status: "Amended",
+    summaryFileUrl: "#",
+    details: { taxableIncome: 72000, originalTaxLiability: 7800, amendedTaxLiability: 7500, reasonForAmendment: "Forgot to include charitable donations.", submissionId: "AMEND-2022-Annual-DEF456", notes: "Amendment resulted in a small additional refund." }
   },
-  { 
-    id: "4", 
+  {
+    id: "4",
     date: subMonths(subYears(new Date(), 3), 10).toISOString(), // Approx Oct 20 three years ago
-    year: new Date().getFullYear() - 3, 
-    type: "Annual Filing", 
-    status: "Submitted", 
-    details: { taxableIncome: 68000, deductionsClaimed: 12000, taxLiability: 7000, amountDue: 200, submissionId: "SUB-2021-Annual-GHI789", notes: "Filed on time."} 
+    year: new Date().getFullYear() - 3,
+    type: "Annual Filing",
+    status: "Submitted",
+    details: { taxableIncome: 68000, deductionsClaimed: 12000, taxLiability: 7000, amountDue: 200, submissionId: "SUB-2021-Annual-GHI789", notes: "Filed on time."}
   },
   {
     id: "5",
@@ -97,7 +97,6 @@ const getHistoryTypeTranslationKey = (type: string): string => {
   switch (type) {
     case "Annual Filing": return "historyPage.type.annualFiling";
     case "Quarterly Estimate": return "historyPage.type.quarterlyEstimate";
-    // Add more cases if other types are introduced in mockData
     default: return type;
   }
 }
@@ -112,6 +111,7 @@ export function TaxHistoryList() {
 
 
   useEffect(() => {
+    console.log("TaxHistoryList: Setting mock history data. If you see this, the component is trying to load its mock data."); // Diagnostic log
     setTimeout(() => {
        const sortedInitialHistory = mockHistoryData.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setHistory(sortedInitialHistory);
@@ -294,7 +294,7 @@ export function TaxHistoryList() {
                   <p className="font-medium bg-muted p-2 rounded-md mt-1">{selectedEntry.details.notes}</p>
                 </div>
               )}
-               {!Object.keys(selectedEntry.details || {}).length && 
+               {!Object.keys(selectedEntry.details || {}).length &&
                 <p className="text-muted-foreground">{t('historyPage.detailsDialog.noDetails')}</p>}
             </div>
             <DialogFooter className="mt-4">
@@ -308,3 +308,5 @@ export function TaxHistoryList() {
     </>
   );
 }
+
+    
