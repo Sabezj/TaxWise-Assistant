@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { FinancialData, IncomeData, ExpenseData, MonetaryAmount, Currency } from "@/types";
-import { Save, Briefcase, TrendingUp as TrendingUpIcon, Landmark, PiggyBank, Home, Users, Activity, HelpCircle, Building, Euro, RussianRuble, CircleDollarSign } from "lucide-react";
+import { Save, Briefcase, TrendingUp as TrendingUpIcon, Landmark, PiggyBank, Home, Users, Activity, HelpCircle, Building, Euro, RussianRuble, CircleDollarSign, Loader2 } from "lucide-react";
 import { useI18n, AvailableCurrencies } from "@/contexts/i18n-context";
 import { Separator } from "@/components/ui/separator";
 
@@ -51,27 +51,50 @@ const formSchema = (t: Function, defaultCurrency: Currency) => z.object({
 
 type FormSchemaType = ReturnType<typeof formSchema>;
 
-const getDefaultMonetaryAmount = (initialValue: number | undefined, initialCurrency: Currency | undefined, defaultGlobalCurrency: Currency): MonetaryAmount => ({
-  value: initialValue ?? 0,
+// Helper to create a default MonetaryAmount, primarily for initialization/reset
+const getDefaultMonetaryAmount = (initialValue: number | undefined = 0, initialCurrency: Currency | undefined, defaultGlobalCurrency: Currency): MonetaryAmount => ({
+  value: initialValue,
   currency: initialCurrency ?? defaultGlobalCurrency,
 });
 
-const getDefaultValues = (initialData?: Partial<FinancialData> | null, defaultGlobalCurrency: Currency = 'USD'): z.infer<FormSchemaType> => ({
+// Defines the structure of an empty financial data object, used for form reset and initial state.
+const getEmptyFinancialFormValues = (defaultGlobalCurrency: Currency): z.infer<FormSchemaType> => ({
   income: {
-    job: getDefaultMonetaryAmount(initialData?.income?.job?.value, initialData?.income?.job?.currency, defaultGlobalCurrency),
-    investments: getDefaultMonetaryAmount(initialData?.income?.investments?.value, initialData?.income?.investments?.currency, defaultGlobalCurrency),
-    propertyIncome: getDefaultMonetaryAmount(initialData?.income?.propertyIncome?.value, initialData?.income?.propertyIncome?.currency, defaultGlobalCurrency),
-    credits: getDefaultMonetaryAmount(initialData?.income?.credits?.value, initialData?.income?.credits?.currency, defaultGlobalCurrency),
-    otherIncomeDetails: initialData?.income?.otherIncomeDetails || "",
+    job: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    investments: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    propertyIncome: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    credits: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    otherIncomeDetails: "",
   },
   expenses: {
-    medical: getDefaultMonetaryAmount(initialData?.expenses?.medical?.value, initialData?.expenses?.medical?.currency, defaultGlobalCurrency),
-    educational: getDefaultMonetaryAmount(initialData?.expenses?.educational?.value, initialData?.expenses?.educational?.currency, defaultGlobalCurrency),
-    social: getDefaultMonetaryAmount(initialData?.expenses?.social?.value, initialData?.expenses?.social?.currency, defaultGlobalCurrency),
-    property: getDefaultMonetaryAmount(initialData?.expenses?.property?.value, initialData?.expenses?.property?.currency, defaultGlobalCurrency),
-    otherExpensesDetails: initialData?.expenses?.otherExpensesDetails || "",
+    medical: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    educational: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    social: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    property: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    otherExpensesDetails: "",
   },
 });
+
+// Populates the form with initialData, or with empty values if initialData is null/undefined.
+const getDefaultValuesForForm = (initialData?: Partial<FinancialData> | null, defaultGlobalCurrency: Currency = 'USD'): z.infer<FormSchemaType> => {
+    const emptyState = getEmptyFinancialFormValues(defaultGlobalCurrency);
+    return {
+        income: {
+            job: initialData?.income?.job ?? emptyState.income.job,
+            investments: initialData?.income?.investments ?? emptyState.income.investments,
+            propertyIncome: initialData?.income?.propertyIncome ?? emptyState.income.propertyIncome,
+            credits: initialData?.income?.credits ?? emptyState.income.credits,
+            otherIncomeDetails: initialData?.income?.otherIncomeDetails ?? emptyState.income.otherIncomeDetails,
+        },
+        expenses: {
+            medical: initialData?.expenses?.medical ?? emptyState.expenses.medical,
+            educational: initialData?.expenses?.educational ?? emptyState.expenses.educational,
+            social: initialData?.expenses?.social ?? emptyState.expenses.social,
+            property: initialData?.expenses?.property ?? emptyState.expenses.property,
+            otherExpensesDetails: initialData?.expenses?.otherExpensesDetails ?? emptyState.expenses.otherExpensesDetails,
+        },
+    };
+};
 
 
 interface DataInputFormProps {
@@ -86,43 +109,42 @@ export function DataInputForm({ initialData, onSubmit, isSubmitting }: DataInput
 
   const form = useForm<z.infer<typeof currentFormSchema>>({
     resolver: zodResolver(currentFormSchema),
-    defaultValues: getDefaultValues(initialData, globalCurrency),
+    defaultValues: getDefaultValuesForForm(initialData, globalCurrency),
   });
 
-  const [isEffectivelyEmpty, setIsEffectivelyEmpty] = React.useState(true);
+  const [isFormEffectivelyEmpty, setIsFormEffectivelyEmpty] = React.useState(true);
   const watchedValues = form.watch();
 
   React.useEffect(() => {
-    const checkFormEffectivelyEmpty = (values: z.infer<typeof currentFormSchema>): boolean => {
+    const checkFormIsNumericEmpty = (values: z.infer<typeof currentFormSchema>): boolean => {
       const { income, expenses } = values;
-      const allIncomeValues = [
+      const allNumericIncomeValues = [
         income.job.value,
         income.investments.value,
         income.propertyIncome.value,
         income.credits.value,
       ];
-      const allExpenseValues = [
+      const allNumericExpenseValues = [
         expenses.medical.value,
         expenses.educational.value,
         expenses.social.value,
         expenses.property.value,
       ];
-      return ![...allIncomeValues, ...allExpenseValues].some(val => val > 0);
+      // Check if ALL numeric values are zero or undefined/NaN (though schema defaults to 0)
+      return ![...allNumericIncomeValues, ...allNumericExpenseValues].some(val => typeof val === 'number' && val > 0);
     };
-    setIsEffectivelyEmpty(checkFormEffectivelyEmpty(watchedValues));
+    setIsFormEffectivelyEmpty(checkFormIsNumericEmpty(watchedValues));
   }, [watchedValues]);
   
   React.useEffect(() => {
-    // Reset form when initialData changes (e.g., data cleared from parent)
-    // or when globalCurrency changes and form should adopt it for new entries.
-    form.reset(getDefaultValues(initialData, globalCurrency));
+    form.reset(getDefaultValuesForForm(initialData, globalCurrency));
   }, [initialData, form, globalCurrency]);
 
 
   const handleFormSubmit = async (values: z.infer<typeof currentFormSchema>) => {
-    await onSubmit(values as FinancialData);
-    // Reset the form to default empty values after successful submission
-    form.reset(getDefaultValues(undefined, globalCurrency));
+    await onSubmit(values as FinancialData); // Call parent's submit logic
+    // After successful submission by parent, reset form to a truly empty state
+    form.reset(getEmptyFinancialFormValues(globalCurrency));
   };
 
   const incomeFields: { name: keyof Omit<IncomeData, 'otherIncomeDetails'>; labelKey: string; descKey: string; placeholderKey: string; icon: React.ElementType}[] = [
@@ -149,8 +171,8 @@ export function DataInputForm({ initialData, onSubmit, isSubmitting }: DataInput
       <FormField
         key={fieldName}
         control={control}
-        name={fieldName}
-        render={({ field }) => (
+        name={fieldName} // This will now point to an object { value, currency }
+        render={({ field }) => ( // field.value is { value, currency }
           <FormItem>
             <FormLabel className="flex items-center">
               <fieldInfo.icon className="mr-2 h-4 w-4 text-muted-foreground" /> {t(fieldInfo.labelKey)}
@@ -160,14 +182,15 @@ export function DataInputForm({ initialData, onSubmit, isSubmitting }: DataInput
                 <Input
                   type="number"
                   placeholder={t(fieldInfo.placeholderKey)}
-                  value={field.value.value}
+                  value={field.value.value} // Access .value for the number
                   onChange={(e) => field.onChange({ ...field.value, value: parseFloat(e.target.value) || 0 })}
-                  min="0" // Ensure non-negative values
+                  min="0"
+                  step="any" // Allow decimals
                 />
               </FormControl>
               <Controller
                 control={control}
-                name={`${fieldName}.currency` as any} 
+                name={`${fieldName}.currency` as any} // Control the currency part of the object
                 render={({ field: currencyField }) => (
                   <Select 
                     value={currencyField.value} 
@@ -190,7 +213,7 @@ export function DataInputForm({ initialData, onSubmit, isSubmitting }: DataInput
               />
             </div>
             <FormDescription>{t(fieldInfo.descKey)}</FormDescription>
-            <FormMessage />
+            <FormMessage /> {/* For validation errors on the whole {value, currency} object if any */}
           </FormItem>
         )}
       />
@@ -256,8 +279,18 @@ export function DataInputForm({ initialData, onSubmit, isSubmitting }: DataInput
           />
         </div>
         
-        <Button type="submit" className="w-full md:w-auto mt-8" disabled={isSubmitting || isEffectivelyEmpty}>
-          {isSubmitting ? t("dashboard.dataInputForm.savingButton") : <><Save className="mr-2 h-4 w-4" /> {t("dashboard.dataInputForm.saveButton")}</>}
+        <Button type="submit" className="w-full md:w-auto mt-8" disabled={isSubmitting || isFormEffectivelyEmpty}>
+          {isSubmitting ? (
+            <>
+              <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" />
+              {t("dashboard.dataInputForm.savingButton")}
+            </>
+          ) : (
+            <>
+              <Save className="mr-2 h-4 w-4" /> 
+              {t("dashboard.dataInputForm.saveButton")}
+            </>
+          )}
         </Button>
       </form>
     </Form>

@@ -12,7 +12,7 @@ import type { FinancialData, UploadedDocument, MonetaryAmount, Currency, UserPro
 import { getDeductionSuggestions, type SuggestionRequestPayload, logUserAction, exportUserDocuments as exportUserDocumentsAction } from "@/lib/actions";
 import type { SuggestDeductionsOutput } from "@/ai/flows/suggest-deductions";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, FileText, DollarSign, FileArchive, Loader2, Trash2, BarChart3 } from "lucide-react";
+import { Sparkles, FileText, DollarSign, FileArchive, Loader2, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,26 +35,9 @@ import { useRouter } from 'next/navigation';
 const FINANCIAL_DATA_COLLECTION = "userFinancialData";
 const UPLOADED_DOCS_METADATA_COLLECTION = "userDocumentMetadata";
 
-
 const getDefaultMonetaryAmount = (value: number = 0, currency: Currency): MonetaryAmount => ({ value, currency });
 
-const getInitialFinancialData = (defaultCurrency: Currency): FinancialData => ({
-  income: {
-    job: getDefaultMonetaryAmount(50000, 'USD'),
-    investments: getDefaultMonetaryAmount(200, 'EUR'),
-    propertyIncome: getDefaultMonetaryAmount(0, 'RUB'),
-    credits: getDefaultMonetaryAmount(1000, 'USD'),
-    otherIncomeDetails: "Freelance project payment (initial example)",
-  },
-  expenses: {
-    medical: getDefaultMonetaryAmount(150, 'USD'),
-    educational: getDefaultMonetaryAmount(0, 'EUR'),
-    social: getDefaultMonetaryAmount(5000, 'RUB'),
-    property: getDefaultMonetaryAmount(1200, 'USD'),
-    otherExpensesDetails: "Software subscriptions for work (initial example)",
-  }
-});
-
+// This is the definitive "empty" or "new user" state for financial data.
 const getEmptyFinancialData = (defaultCurrency: Currency): FinancialData => ({
   income: {
     job: getDefaultMonetaryAmount(0, defaultCurrency),
@@ -91,7 +74,7 @@ export default function DashboardPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    setIsMounted(true); // For preventing hydration errors with localStorage access or theme
+    setIsMounted(true); 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
         setCurrentUser(user);
@@ -119,7 +102,7 @@ export default function DashboardPage() {
     const loadData = async () => {
       if (!currentUser || !currentUserProfile) {
         setIsLoadingPageData(false);
-        setFinancialData(getEmptyFinancialData(globalCurrency));
+        setFinancialData(getEmptyFinancialData(globalCurrency)); // Use empty for non-user or pre-profile load
         setDocuments([]);
         return;
       }
@@ -131,7 +114,10 @@ export default function DashboardPage() {
         if (finDocSnap.exists()) {
           setFinancialData(finDocSnap.data() as FinancialData);
         } else {
-          setFinancialData(getInitialFinancialData(globalCurrency));
+          // If no data in Firestore, set to initial EMPTY state AND save it.
+          const emptyData = getEmptyFinancialData(globalCurrency);
+          await setDoc(financialDataRef, emptyData); 
+          setFinancialData(emptyData);
         }
 
         // Load Documents Metadata
@@ -141,12 +127,12 @@ export default function DashboardPage() {
           setDocuments(docsMetaSnap.data()?.documents as UploadedDocument[]);
         } else {
           setDocuments([]);
-          // Create an empty doc if it doesn't exist to avoid issues on first upload
+          // Create an empty doc metadata if it doesn't exist to avoid issues on first upload
            await setDoc(userDocsMetaRef, { documents: [] });
         }
       } catch (error) {
         console.error("Error loading user data from Firestore:", error);
-        setFinancialData(getEmptyFinancialData(globalCurrency));
+        setFinancialData(getEmptyFinancialData(globalCurrency)); // Fallback on error
         setDocuments([]);
         toast({ title: t("dashboard.toast.loadErrorFirestore"), description: (error as Error).message, variant: "destructive" });
       }
@@ -156,8 +142,9 @@ export default function DashboardPage() {
     if (isMounted && currentUser && currentUserProfile) {
       loadData();
     } else if (!currentUser && isMounted) {
-      // If no user but component is mounted, stop loading
       setIsLoadingPageData(false);
+      setFinancialData(getEmptyFinancialData(globalCurrency)); // Ensure empty state if no user but mounted
+      setDocuments([]);
     }
   }, [currentUser, currentUserProfile, isMounted, toast, t, globalCurrency]);
 
@@ -170,8 +157,8 @@ export default function DashboardPage() {
     setIsSubmittingFinancialData(true);
     try {
       const financialDataRef = doc(db, FINANCIAL_DATA_COLLECTION, currentUser.uid);
-      await setDoc(financialDataRef, data);
-      setFinancialData(data); // Update local state
+      await setDoc(financialDataRef, data); // This will create if not exists, or overwrite
+      setFinancialData(data); 
       await logUserAction(currentUser.uid, currentUserProfile.name || currentUserProfile.email || "User", "Financial Data Saved");
       toast({
         title: t("dashboard.dataInputForm.toast.savedFirestore"),
@@ -204,7 +191,7 @@ export default function DashboardPage() {
       try {
         await uploadBytes(fileRef, file);
         const newDocMetadata: UploadedDocument = {
-          id: uniqueFileName, // Using filename as ID for simplicity here
+          id: uniqueFileName,
           name: file.name,
           type: file.type,
           size: file.size,
@@ -244,9 +231,14 @@ export default function DashboardPage() {
     try {
       await deleteFirebaseStorageObject(fileRef);
       const userDocsMetaRef = doc(db, UPLOADED_DOCS_METADATA_COLLECTION, currentUser.uid);
-      await updateDoc(userDocsMetaRef, {
-        documents: arrayRemove(docToRemove) // Firestore can remove based on object equality if structure matches
-      });
+      // To remove an item from an array in Firestore, we need to fetch the doc, filter the array, and set it again.
+      // Or, if the object is exactly the same, arrayRemove might work. For robustness, fetch-filter-set is safer.
+      const docSnap = await getDoc(userDocsMetaRef);
+      if (docSnap.exists()) {
+          const currentDocs = (docSnap.data()?.documents || []) as UploadedDocument[];
+          const updatedDocs = currentDocs.filter(d => d.id !== docToRemove.id);
+          await updateDoc(userDocsMetaRef, { documents: updatedDocs });
+      }
       setDocuments(prevDocs => prevDocs.filter(d => d.id !== docToRemove.id));
       await logUserAction(currentUser.uid, currentUserProfile.name || currentUserProfile.email || "User", "Document Removed", `File: ${docToRemove.name}`);
       toast({ title: t("dashboard.documentUpload.toast.docRemovedTitle"), description: t("dashboard.documentUpload.toast.docRemovedDescription", { name: docToRemove.name }) });
@@ -276,23 +268,26 @@ export default function DashboardPage() {
     setSuggestions(undefined);
 
     const documentDataUrls: string[] = [];
-    for (const docMeta of documents) {
-      if (!docMeta.storagePath) continue;
-      try {
-        const fileRef = ref(storage, docMeta.storagePath);
-        const blob = await getBlob(fileRef);
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        documentDataUrls.push(dataUrl);
-      } catch (error) {
-        console.error(`Failed to get data URI for ${docMeta.name}:`, error);
-        toast({title: t("dashboard.toast.fetchErrorDocAI", { name: docMeta.name }), description: (error as Error).message, variant: "destructive"})
+    if (documents && documents.length > 0) {
+      for (const docMeta of documents) {
+        if (!docMeta.storagePath) continue;
+        try {
+          const fileRef = ref(storage, docMeta.storagePath);
+          const blob = await getBlob(fileRef);
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          documentDataUrls.push(dataUrl);
+        } catch (error) {
+          console.error(`Failed to get data URI for ${docMeta.name}:`, error);
+          toast({title: t("dashboard.toast.fetchErrorDocAI", { name: docMeta.name }), description: (error as Error).message, variant: "destructive"})
+        }
       }
     }
+    
 
     const payload: SuggestionRequestPayload = {
       financialData,
@@ -370,7 +365,7 @@ export default function DashboardPage() {
     setIsClearingData(false);
   };
 
-  const handleExportDocuments = useCallback(async (category: string, docStoragePaths: UserUploadedDocForExport[]) => {
+  const handleExportDocuments = useCallback(async (category: TaxExportCategory, docsToExport: UserUploadedDocForExport[]) => {
     if (!currentUser || !currentUserProfile) {
         toast({ title: t("errors.notAuthenticated"), variant: "destructive" });
         return { error: t("errors.notAuthenticatedDescription") };
@@ -378,13 +373,13 @@ export default function DashboardPage() {
     return exportUserDocumentsAction(
         currentUser.uid, 
         currentUserProfile.name || currentUserProfile.email || "User", 
-        category as any, 
-        docStoragePaths
+        category, 
+        docsToExport
     );
   }, [currentUser, currentUserProfile, toast, t]);
 
 
-  if (!isMounted || isLoadingPageData || !currentUserProfile) {
+  if (!isMounted || isLoadingPageData || !currentUser || !currentUserProfile) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -393,7 +388,7 @@ export default function DashboardPage() {
     );
   }
   
-  if (!financialData) { // Should ideally be covered by isLoadingPageData, but as a fallback
+  if (!financialData) { 
       return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -402,33 +397,32 @@ export default function DashboardPage() {
     );
   }
 
-  const isFinancialDataEffectivelyEmpty = (data: FinancialData | null): boolean => {
+  const isFinancialDataEffectivelyEmptyForSave = (data: FinancialData | null): boolean => {
     if (!data) return true;
     const { income, expenses } = data;
     const isIncomeEmpty =
       income.job.value === 0 &&
       income.investments.value === 0 &&
       income.propertyIncome.value === 0 &&
-      income.credits.value === 0 &&
-      (income.otherIncomeDetails === "" || !income.otherIncomeDetails);
+      income.credits.value === 0;
+      // We don't check otherIncomeDetails for "emptiness" to disable save
     const isExpensesEmpty =
       expenses.medical.value === 0 &&
       expenses.educational.value === 0 &&
       expenses.social.value === 0 &&
-      expenses.property.value === 0 &&
-      (expenses.otherExpensesDetails === "" || !expenses.otherExpensesDetails);
+      expenses.property.value === 0;
+      // We don't check otherExpensesDetails for "emptiness" to disable save
     return isIncomeEmpty && isExpensesEmpty;
   };
-
-  const hasDataForExport = !isFinancialDataEffectivelyEmpty(financialData) || documents.length > 0;
-  const hasAnyData = !isFinancialDataEffectivelyEmpty(financialData) || documents.length > 0 || !!suggestions;
+  
+  const hasAnyDataForClearButton = !isFinancialDataEffectivelyEmptyForSave(financialData) || documents.length > 0 || !!suggestions;
 
 
   return (
     <div className="container mx-auto py-8 px-4 md:px-0">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-4 sm:mb-0">{t('taxwiseDashboard')}</h1>
-        {hasAnyData && (
+        {hasAnyDataForClearButton && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="sm" disabled={isClearingData}>
@@ -474,7 +468,7 @@ export default function DashboardPage() {
             <CardContent>
               <DataInputForm
                 onSubmit={handleFinancialDataSubmit}
-                initialData={financialData}
+                initialData={financialData} // This will be the current state from Firestore or empty
                 isSubmitting={isSubmittingFinancialData}
                 key={JSON.stringify(financialData)} 
               />
@@ -517,7 +511,7 @@ export default function DashboardPage() {
             <CardContent className="space-y-4">
                <Button
                 onClick={handleGetSuggestions}
-                disabled={isLoadingSuggestions || isFinancialDataEffectivelyEmpty(financialData) || !currentUserProfile}
+                disabled={isLoadingSuggestions || isFinancialDataEffectivelyEmptyForSave(financialData) || !currentUserProfile}
                 className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
                 size="lg"
               >
@@ -552,11 +546,10 @@ export default function DashboardPage() {
               <ExportDocuments
                 userId={currentUser?.uid || "unknown-user"} 
                 userName={currentUserProfile?.name || currentUserProfile?.email || "Unknown User"}
-                hasDataToExport={hasDataForExport}
-                uploadedDocuments={documents} // Pass UploadedDocument[]
-                onInitiateExport={async (category, docsToExport) => { // Add this prop
-                  return handleExportDocuments(category, docsToExport);
-                }}
+                // Pass all uploaded documents, ExportDocuments will use storagePath for generating signed URLs
+                uploadedDocuments={documents} 
+                onInitiateExport={handleExportDocuments}
+                 // hasDataToExport prop is removed as ExportDocuments can determine this internally
               />
             </CardContent>
           </Card>
@@ -565,3 +558,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
