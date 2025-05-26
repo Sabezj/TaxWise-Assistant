@@ -3,75 +3,89 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { FinancialData, MonetaryAmount, CurrencyRates, TransactionViewItem, Currency } from "@/types";
+import type { FinancialData, MonetaryAmount, CurrencyRates, TransactionViewItem, Currency, UserProfile } from "@/types";
 import { useI18n } from '@/contexts/i18n-context';
 import { Loader2, PackageOpen, ListTree } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import type { User } from "firebase/auth";
 
-const FINANCIAL_DATA_STORAGE_KEY = "taxwise-financial-data-v3"; // Must match dashboard
-
-const getDefaultMonetaryAmount = (currency: Currency): MonetaryAmount => ({ value: 0, currency });
-
-const getInitialFinancialData = (defaultCurrency: Currency): FinancialData => ({
+const getEmptyFinancialData = (defaultCurrency: Currency): FinancialData => ({
   income: {
-    job: getDefaultMonetaryAmount(defaultCurrency),
-    investments: getDefaultMonetaryAmount(defaultCurrency),
-    propertyIncome: getDefaultMonetaryAmount(defaultCurrency),
-    credits: getDefaultMonetaryAmount(defaultCurrency),
+    job: { value: 0, currency: defaultCurrency },
+    investments: { value: 0, currency: defaultCurrency },
+    propertyIncome: { value: 0, currency: defaultCurrency },
+    credits: { value: 0, currency: defaultCurrency },
     otherIncomeDetails: "",
   },
   expenses: {
-    medical: getDefaultMonetaryAmount(defaultCurrency),
-    educational: getDefaultMonetaryAmount(defaultCurrency),
-    social: getDefaultMonetaryAmount(defaultCurrency),
-    property: getDefaultMonetaryAmount(defaultCurrency),
+    medical: { value: 0, currency: defaultCurrency },
+    educational: { value: 0, currency: defaultCurrency },
+    social: { value: 0, currency: defaultCurrency },
+    property: { value: 0, currency: defaultCurrency },
     otherExpensesDetails: "",
   }
 });
 
 export default function TransactionsPage() {
-  const { t, currency: displayCurrency, currencyRates, convertCurrency, formatCurrency } = useI18n();
+  const { t, currency: displayCurrency, currencyRates, convertCurrency, formatCurrency, isLoadingSettings: isLoadingI18nSettings } = useI18n();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [financialData, setFinancialData] = useState<FinancialData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingFinancialData, setIsLoadingFinancialData] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
-    try {
-      const storedData = localStorage.getItem(FINANCIAL_DATA_STORAGE_KEY);
-      if (storedData) {
-        const parsedData = JSON.parse(storedData) as FinancialData;
-        if (parsedData && parsedData.income && parsedData.expenses) {
-          setFinancialData(parsedData);
-        } else {
-          setFinancialData(getInitialFinancialData(displayCurrency));
-        }
-      } else {
-        setFinancialData(getInitialFinancialData(displayCurrency));
-      }
-    } catch (error) {
-      console.error("Error loading financial data from localStorage:", error);
-      setFinancialData(getInitialFinancialData(displayCurrency));
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser || isLoadingI18nSettings || !isMounted) {
+       if (isMounted && !currentUser) setIsLoadingFinancialData(false);
+      return;
     }
-    setIsLoading(false);
-  }, [displayCurrency]);
+
+    const loadFinancialData = async () => {
+      setIsLoadingFinancialData(true);
+      try {
+        const finDataRef = doc(db, "userFinancialData", currentUser.uid);
+        const docSnap = await getDoc(finDataRef);
+        if (docSnap.exists()) {
+          setFinancialData(docSnap.data() as FinancialData);
+        } else {
+          setFinancialData(getEmptyFinancialData(displayCurrency));
+        }
+      } catch (error) {
+        console.error("Error loading financial data for transactions from Firestore:", error);
+        setFinancialData(getEmptyFinancialData(displayCurrency));
+      }
+      setIsLoadingFinancialData(false);
+    };
+
+    loadFinancialData();
+  }, [currentUser, displayCurrency, isLoadingI18nSettings, isMounted]);
+
 
   const convertedFinancialData = useMemo(() => {
     if (!financialData || !currencyRates) return null;
-    const convertCategory = (category: MonetaryAmount) => convertCurrency(category, displayCurrency, currencyRates);
+    const convertCat = (category: MonetaryAmount) => convertCurrency(category, displayCurrency, currencyRates);
     return {
       income: {
-        job: { value: convertCategory(financialData.income.job), currency: displayCurrency },
-        investments: { value: convertCategory(financialData.income.investments), currency: displayCurrency },
-        propertyIncome: { value: convertCategory(financialData.income.propertyIncome), currency: displayCurrency },
-        credits: { value: convertCategory(financialData.income.credits), currency: displayCurrency },
+        job: { value: convertCat(financialData.income.job), currency: displayCurrency },
+        investments: { value: convertCat(financialData.income.investments), currency: displayCurrency },
+        propertyIncome: { value: convertCat(financialData.income.propertyIncome), currency: displayCurrency },
+        credits: { value: convertCat(financialData.income.credits), currency: displayCurrency },
         otherIncomeDetails: financialData.income.otherIncomeDetails,
       },
       expenses: {
-        medical: { value: convertCategory(financialData.expenses.medical), currency: displayCurrency },
-        educational: { value: convertCategory(financialData.expenses.educational), currency: displayCurrency },
-        social: { value: convertCategory(financialData.expenses.social), currency: displayCurrency },
-        property: { value: convertCategory(financialData.expenses.property), currency: displayCurrency },
+        medical: { value: convertCat(financialData.expenses.medical), currency: displayCurrency },
+        educational: { value: convertCat(financialData.expenses.educational), currency: displayCurrency },
+        social: { value: convertCat(financialData.expenses.social), currency: displayCurrency },
+        property: { value: convertCat(financialData.expenses.property), currency: displayCurrency },
         otherExpensesDetails: financialData.expenses.otherExpensesDetails,
       }
     };
@@ -90,7 +104,7 @@ export default function TransactionsPage() {
           categoryLabelKey: `chartLabels.income.${key}`,
           originalValue: financialData.income[key].value,
           originalCurrency: financialData.income[key].currency,
-          // @ts-ignore // Accessing potentially non-existent key if financialData.income structure changes
+          // @ts-ignore 
           convertedValue: convertedFinancialData.income[key]?.value ?? 0,
           displayCurrency: displayCurrency,
         });
@@ -105,17 +119,17 @@ export default function TransactionsPage() {
           categoryLabelKey: `chartLabels.expenses.${key}`,
           originalValue: financialData.expenses[key].value,
           originalCurrency: financialData.expenses[key].currency,
-          // @ts-ignore // Accessing potentially non-existent key if financialData.expenses structure changes
+          // @ts-ignore 
           convertedValue: convertedFinancialData.expenses[key]?.value ?? 0,
           displayCurrency: displayCurrency,
         });
       }
     });
-    return items;
+    return items.sort((a, b) => (a.categoryLabelKey.localeCompare(b.categoryLabelKey))); // Sort for consistent order
   }, [financialData, convertedFinancialData, displayCurrency]);
 
 
-  if (!isMounted || isLoading) {
+  if (!isMounted || isLoadingFinancialData || isLoadingI18nSettings) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-0 flex items-center justify-center h-[calc(100vh-10rem)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -182,3 +196,5 @@ export default function TransactionsPage() {
     </div>
   );
 }
+
+    

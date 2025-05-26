@@ -4,60 +4,75 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FinancialSummaryChart } from "@/components/dashboard/financial-summary-chart";
-import type { FinancialData, MonetaryAmount, CurrencyRates, TransactionViewItem, Currency } from "@/types";
+import type { FinancialData, MonetaryAmount, CurrencyRates, TransactionViewItem, Currency, UserProfile } from "@/types";
 import { useI18n } from '@/contexts/i18n-context';
 import { Loader2, PackageOpen, Info, BarChart3, PieChart as PieChartIcon } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend as RechartsLegend, Tooltip as RechartsTooltip } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import type { User } from "firebase/auth";
 
-const FINANCIAL_DATA_STORAGE_KEY = "taxwise-financial-data-v3"; // Must match dashboard
-
-const getDefaultMonetaryAmount = (currency: Currency): MonetaryAmount => ({ value: 0, currency });
-
-const getInitialFinancialData = (defaultCurrency: Currency): FinancialData => ({
+const getEmptyFinancialData = (defaultCurrency: Currency): FinancialData => ({
   income: {
-    job: getDefaultMonetaryAmount(defaultCurrency),
-    investments: getDefaultMonetaryAmount(defaultCurrency),
-    propertyIncome: getDefaultMonetaryAmount(defaultCurrency),
-    credits: getDefaultMonetaryAmount(defaultCurrency),
+    job: { value: 0, currency: defaultCurrency },
+    investments: { value: 0, currency: defaultCurrency },
+    propertyIncome: { value: 0, currency: defaultCurrency },
+    credits: { value: 0, currency: defaultCurrency },
     otherIncomeDetails: "",
   },
   expenses: {
-    medical: getDefaultMonetaryAmount(defaultCurrency),
-    educational: getDefaultMonetaryAmount(defaultCurrency),
-    social: getDefaultMonetaryAmount(defaultCurrency),
-    property: getDefaultMonetaryAmount(defaultCurrency),
+    medical: { value: 0, currency: defaultCurrency },
+    educational: { value: 0, currency: defaultCurrency },
+    social: { value: 0, currency: defaultCurrency },
+    property: { value: 0, currency: defaultCurrency },
     otherExpensesDetails: "",
   }
 });
 
 export default function AnalyticsPage() {
-  const { t, currency: displayCurrency, currencyRates, convertCurrency, formatCurrency } = useI18n();
+  const { t, currency: displayCurrency, currencyRates, convertCurrency, formatCurrency, isLoadingSettings: isLoadingI18nSettings } = useI18n();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [financialData, setFinancialData] = useState<FinancialData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingFinancialData, setIsLoadingFinancialData] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
-    try {
-      const storedData = localStorage.getItem(FINANCIAL_DATA_STORAGE_KEY);
-      if (storedData) {
-        const parsedData = JSON.parse(storedData) as FinancialData;
-        if (parsedData && parsedData.income && parsedData.expenses) {
-          setFinancialData(parsedData);
-        } else {
-          setFinancialData(getInitialFinancialData(displayCurrency));
-        }
-      } else {
-        setFinancialData(getInitialFinancialData(displayCurrency));
-      }
-    } catch (error) {
-      console.error("Error loading financial data from localStorage:", error);
-      setFinancialData(getInitialFinancialData(displayCurrency));
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser || isLoadingI18nSettings || !isMounted) {
+      if (isMounted && !currentUser) setIsLoadingFinancialData(false); // Not logged in, no data to load
+      return;
     }
-    setIsLoading(false);
-  }, [displayCurrency]);
+
+    const loadFinancialData = async () => {
+      setIsLoadingFinancialData(true);
+      try {
+        const finDataRef = doc(db, "userFinancialData", currentUser.uid);
+        const docSnap = await getDoc(finDataRef);
+        if (docSnap.exists()) {
+          setFinancialData(docSnap.data() as FinancialData);
+        } else {
+          setFinancialData(getEmptyFinancialData(displayCurrency));
+        }
+      } catch (error) {
+        console.error("Error loading financial data for analytics from Firestore:", error);
+        setFinancialData(getEmptyFinancialData(displayCurrency));
+        // Consider showing a toast error
+      }
+      setIsLoadingFinancialData(false);
+    };
+
+    loadFinancialData();
+  }, [currentUser, displayCurrency, isLoadingI18nSettings, isMounted]);
+
 
   const convertedFinancialData = useMemo(() => {
     if (!financialData || !currencyRates) return null;
@@ -101,7 +116,7 @@ export default function AnalyticsPage() {
   };
 
 
-  if (!isMounted || isLoading) {
+  if (!isMounted || isLoadingFinancialData || isLoadingI18nSettings) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-0 flex items-center justify-center h-[calc(100vh-10rem)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -110,7 +125,7 @@ export default function AnalyticsPage() {
     );
   }
 
-  if (!financialData || !convertedFinancialData) {
+  if (!financialData || !convertedFinancialData || (convertedFinancialData.income.job.value === 0 && convertedFinancialData.income.investments.value === 0 && convertedFinancialData.income.propertyIncome.value === 0 && convertedFinancialData.income.credits.value === 0 && convertedFinancialData.expenses.medical.value === 0 && convertedFinancialData.expenses.educational.value === 0 && convertedFinancialData.expenses.social.value === 0 && convertedFinancialData.expenses.property.value === 0)) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-0 text-center">
         <h1 className="text-3xl font-bold mb-2 text-foreground">{t('analyticsPage.title')}</h1>
@@ -197,7 +212,7 @@ export default function AnalyticsPage() {
                         const x = cx + radius * Math.cos(-midAngle * RADIAN);
                         const y = cy + radius * Math.sin(-midAngle * RADIAN);
                         return ( (percent*100) > 5 ? // Only show label if percent is > 5%
-                          <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="10px">
+                          <text x={x} y={y} fill="hsl(var(--primary-foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="10px">
                             {`${(percent * 100).toFixed(0)}%`}
                           </text> : null
                         );
@@ -234,7 +249,9 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
-      {/* Transaction History Table Removed from here */}
     </div>
   );
 }
+
+
+    
