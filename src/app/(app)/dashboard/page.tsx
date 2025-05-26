@@ -8,7 +8,7 @@ import { DataInputForm } from "@/components/dashboard/data-input-form";
 import { DocumentUpload } from "@/components/dashboard/document-upload";
 import { DeductionSuggestions } from "@/components/dashboard/deduction-suggestions";
 import { ExportDocuments } from "@/components/dashboard/export-documents";
-import type { FinancialData, UploadedDocument, MonetaryAmount, Currency, UserProfile, AuditLogAction, UserUploadedDocForExport } from "@/types";
+import type { FinancialData, UploadedDocument, MonetaryAmount, Currency, UserProfile, TaxExportCategory, UserUploadedDocForExport } from "@/types"; // Added TaxExportCategory and UserUploadedDocForExport
 import { getDeductionSuggestions, type SuggestionRequestPayload, logUserAction, exportUserDocuments as exportUserDocumentsAction } from "@/lib/actions";
 import type { SuggestDeductionsOutput } from "@/ai/flows/suggest-deductions";
 import { useToast } from "@/hooks/use-toast";
@@ -31,13 +31,13 @@ import { doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, wr
 import type { User } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 
-
+// Force Git change
 const FINANCIAL_DATA_COLLECTION = "userFinancialData";
 const UPLOADED_DOCS_METADATA_COLLECTION = "userDocumentMetadata";
 
 const getDefaultMonetaryAmount = (value: number = 0, currency: Currency): MonetaryAmount => ({ value, currency });
 
-// This is the definitive "empty" or "new user" state for financial data.
+// Defines the structure of an empty financial data object, used for form reset and initial state.
 const getEmptyFinancialData = (defaultCurrency: Currency): FinancialData => ({
   income: {
     job: getDefaultMonetaryAmount(0, defaultCurrency),
@@ -74,7 +74,7 @@ export default function DashboardPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    setIsMounted(true); 
+    setIsMounted(true);
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
         setCurrentUser(user);
@@ -83,7 +83,7 @@ export default function DashboardPage() {
         if (docSnap.exists()) {
           setCurrentUserProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
         } else {
-          setCurrentUserProfile(null);
+          setCurrentUserProfile(null); // Should not happen if registration creates a profile
           router.push('/login');
         }
       } else {
@@ -102,7 +102,7 @@ export default function DashboardPage() {
     const loadData = async () => {
       if (!currentUser || !currentUserProfile) {
         setIsLoadingPageData(false);
-        setFinancialData(getEmptyFinancialData(globalCurrency)); // Use empty for non-user or pre-profile load
+        setFinancialData(getEmptyFinancialData(globalCurrency)); // Ensure empty state for non-user or pre-profile load
         setDocuments([]);
         return;
       }
@@ -114,9 +114,9 @@ export default function DashboardPage() {
         if (finDocSnap.exists()) {
           setFinancialData(finDocSnap.data() as FinancialData);
         } else {
-          // If no data in Firestore, set to initial EMPTY state AND save it.
+          // If no data in Firestore, create and set to initial EMPTY state.
           const emptyData = getEmptyFinancialData(globalCurrency);
-          await setDoc(financialDataRef, emptyData); 
+          await setDoc(financialDataRef, emptyData);
           setFinancialData(emptyData);
         }
 
@@ -141,9 +141,9 @@ export default function DashboardPage() {
 
     if (isMounted && currentUser && currentUserProfile) {
       loadData();
-    } else if (!currentUser && isMounted) {
+    } else if (!currentUser && isMounted) { // Handles case where user logs out
       setIsLoadingPageData(false);
-      setFinancialData(getEmptyFinancialData(globalCurrency)); // Ensure empty state if no user but mounted
+      setFinancialData(getEmptyFinancialData(globalCurrency));
       setDocuments([]);
     }
   }, [currentUser, currentUserProfile, isMounted, toast, t, globalCurrency]);
@@ -158,7 +158,7 @@ export default function DashboardPage() {
     try {
       const financialDataRef = doc(db, FINANCIAL_DATA_COLLECTION, currentUser.uid);
       await setDoc(financialDataRef, data); // This will create if not exists, or overwrite
-      setFinancialData(data); 
+      setFinancialData(data);
       await logUserAction(currentUser.uid, currentUserProfile.name || currentUserProfile.email || "User", "Financial Data Saved");
       toast({
         title: t("dashboard.dataInputForm.toast.savedFirestore"),
@@ -190,13 +190,16 @@ export default function DashboardPage() {
       const fileRef = ref(storage, storagePath);
       try {
         await uploadBytes(fileRef, file);
+        // const downloadURL = await getDownloadURL(fileRef); // We can get URL immediately if needed
         const newDocMetadata: UploadedDocument = {
-          id: uniqueFileName,
+          id: uniqueFileName, // Using uniqueFileName as ID for simplicity here
           name: file.name,
           type: file.type,
           size: file.size,
           storagePath: storagePath,
+          // downloadURL: downloadURL, // Optionally store it
         };
+        // Atomically add the new document metadata to the 'documents' array in Firestore
         await updateDoc(userDocsMetaRef, {
           documents: arrayUnion(newDocMetadata)
         });
@@ -228,17 +231,13 @@ export default function DashboardPage() {
         return;
     }
     const fileRef = ref(storage, docToRemove.storagePath);
+    const userDocsMetaRef = doc(db, UPLOADED_DOCS_METADATA_COLLECTION, currentUser.uid);
     try {
       await deleteFirebaseStorageObject(fileRef);
-      const userDocsMetaRef = doc(db, UPLOADED_DOCS_METADATA_COLLECTION, currentUser.uid);
-      // To remove an item from an array in Firestore, we need to fetch the doc, filter the array, and set it again.
-      // Or, if the object is exactly the same, arrayRemove might work. For robustness, fetch-filter-set is safer.
-      const docSnap = await getDoc(userDocsMetaRef);
-      if (docSnap.exists()) {
-          const currentDocs = (docSnap.data()?.documents || []) as UploadedDocument[];
-          const updatedDocs = currentDocs.filter(d => d.id !== docToRemove.id);
-          await updateDoc(userDocsMetaRef, { documents: updatedDocs });
-      }
+      // Atomically remove the document metadata from the 'documents' array in Firestore
+      await updateDoc(userDocsMetaRef, {
+        documents: arrayRemove(docToRemove) // arrayRemove needs the exact object to remove
+      });
       setDocuments(prevDocs => prevDocs.filter(d => d.id !== docToRemove.id));
       await logUserAction(currentUser.uid, currentUserProfile.name || currentUserProfile.email || "User", "Document Removed", `File: ${docToRemove.name}`);
       toast({ title: t("dashboard.documentUpload.toast.docRemovedTitle"), description: t("dashboard.documentUpload.toast.docRemovedDescription", { name: docToRemove.name }) });
@@ -269,11 +268,15 @@ export default function DashboardPage() {
 
     const documentDataUrls: string[] = [];
     if (documents && documents.length > 0) {
+      toast({ title: t("dashboard.toast.preparingDocsAI.title"), description: t("dashboard.toast.preparingDocsAI.description", { count: documents.length}) });
       for (const docMeta of documents) {
         if (!docMeta.storagePath) continue;
         try {
           const fileRef = ref(storage, docMeta.storagePath);
-          const blob = await getBlob(fileRef);
+          // const downloadURL = await getDownloadURL(fileRef); // Get download URL
+          // const response = await fetch(downloadURL); // Fetch the file using the URL
+          // const blob = await response.blob(); // Get blob
+          const blob = await getBlob(fileRef); // More direct way to get blob
           const dataUrl = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result as string);
@@ -286,8 +289,9 @@ export default function DashboardPage() {
           toast({title: t("dashboard.toast.fetchErrorDocAI", { name: docMeta.name }), description: (error as Error).message, variant: "destructive"})
         }
       }
+       toast.dismiss(); // Dismiss "preparing" toast
     }
-    
+
 
     const payload: SuggestionRequestPayload = {
       financialData,
@@ -319,25 +323,24 @@ export default function DashboardPage() {
       return;
     }
     setIsClearingData(true);
-    
+
     try {
       const batch = writeBatch(db);
 
       // Clear Financial Data
       const financialDataRef = doc(db, FINANCIAL_DATA_COLLECTION, currentUser.uid);
       const emptyFinData = getEmptyFinancialData(globalCurrency);
-      batch.set(financialDataRef, emptyFinData);
-      setFinancialData(emptyFinData); 
+      batch.set(financialDataRef, emptyFinData); // Use set to overwrite with empty
+      setFinancialData(emptyFinData);
 
       setSuggestions(undefined);
       setSuggestionError(null);
 
-      // Clear Documents Metadata from Firestore
+      // Clear Documents Metadata from Firestore and delete files from Storage
       const userDocsMetaRef = doc(db, UPLOADED_DOCS_METADATA_COLLECTION, currentUser.uid);
-      batch.set(userDocsMetaRef, { documents: [] });
-      
-      // Delete files from Firebase Storage
-      for (const docMeta of documents) { 
+      batch.set(userDocsMetaRef, { documents: [] }); // Reset documents array in Firestore
+
+      for (const docMeta of documents) {
         if (!docMeta.storagePath) continue;
         const fileRef = ref(storage, docMeta.storagePath);
         try {
@@ -346,7 +349,7 @@ export default function DashboardPage() {
           console.warn(`Could not delete ${docMeta.storagePath} from Firebase Storage during clear all:`, error);
         }
       }
-      setDocuments([]); 
+      setDocuments([]);
 
       await batch.commit();
       await logUserAction(currentUser.uid, currentUserProfile.name || currentUserProfile.email || "User", "All Data Cleared");
@@ -365,18 +368,42 @@ export default function DashboardPage() {
     setIsClearingData(false);
   };
 
-  const handleExportDocuments = useCallback(async (category: TaxExportCategory, docsToExport: UserUploadedDocForExport[]) => {
-    if (!currentUser || !currentUserProfile) {
+  const handleExportDocuments = useCallback(async (category: TaxExportCategory, userDocsForExport: UserUploadedDocForExport[]) => {
+     if (!currentUser || !currentUserProfile) {
         toast({ title: t("errors.notAuthenticated"), variant: "destructive" });
         return { error: t("errors.notAuthenticatedDescription") };
     }
+
+    let docsToActuallyExport: UserUploadedDocForExport[] = [];
+
+    if (documents.length > 0) {
+        toast({ title: t("dashboard.exportDocuments.toast.preparingSignedUrlsTitle"), description: t("dashboard.exportDocuments.toast.preparingSignedUrlsDescription", { count: documents.length}) });
+        try {
+            const urlPromises = documents.map(async (docMeta) => {
+                if (!docMeta.storagePath) return null;
+                const fileRef = ref(storage, docMeta.storagePath);
+                const url = await getDownloadURL(fileRef);
+                return { filename: docMeta.name, signedUrl: url };
+            });
+            const resolvedUrls = await Promise.all(urlPromises);
+            docsToActuallyExport = resolvedUrls.filter(item => item !== null) as UserUploadedDocForExport[];
+            toast.dismiss();
+        } catch (error) {
+            toast.dismiss();
+            console.error("Error generating signed URLs for export:", error);
+            toast({ title: t("dashboard.exportDocuments.toast.signedUrlErrorTitle"), description: t("dashboard.exportDocuments.toast.signedUrlErrorDescription", { error: (error as Error).message }), variant: "destructive" });
+            return { error: t("dashboard.exportDocuments.toast.signedUrlErrorDescription", { error: (error as Error).message })};
+        }
+    }
+
+
     return exportUserDocumentsAction(
-        currentUser.uid, 
-        currentUserProfile.name || currentUserProfile.email || "User", 
-        category, 
-        docsToExport
+        currentUser.uid,
+        currentUserProfile.name || currentUserProfile.email || "User",
+        category,
+        docsToActuallyExport // Pass documents with signed URLs
     );
-  }, [currentUser, currentUserProfile, toast, t]);
+  }, [currentUser, currentUserProfile, documents, toast, t]);
 
 
   if (!isMounted || isLoadingPageData || !currentUser || !currentUserProfile) {
@@ -387,8 +414,8 @@ export default function DashboardPage() {
       </div>
     );
   }
-  
-  if (!financialData) { 
+
+  if (!financialData) {
       return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -405,16 +432,14 @@ export default function DashboardPage() {
       income.investments.value === 0 &&
       income.propertyIncome.value === 0 &&
       income.credits.value === 0;
-      // We don't check otherIncomeDetails for "emptiness" to disable save
     const isExpensesEmpty =
       expenses.medical.value === 0 &&
       expenses.educational.value === 0 &&
       expenses.social.value === 0 &&
       expenses.property.value === 0;
-      // We don't check otherExpensesDetails for "emptiness" to disable save
     return isIncomeEmpty && isExpensesEmpty;
   };
-  
+
   const hasAnyDataForClearButton = !isFinancialDataEffectivelyEmptyForSave(financialData) || documents.length > 0 || !!suggestions;
 
 
@@ -468,9 +493,9 @@ export default function DashboardPage() {
             <CardContent>
               <DataInputForm
                 onSubmit={handleFinancialDataSubmit}
-                initialData={financialData} // This will be the current state from Firestore or empty
+                initialData={financialData}
                 isSubmitting={isSubmittingFinancialData}
-                key={JSON.stringify(financialData)} 
+                key={JSON.stringify(financialData)}
               />
             </CardContent>
           </Card>
@@ -544,12 +569,10 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <ExportDocuments
-                userId={currentUser?.uid || "unknown-user"} 
+                userId={currentUser?.uid || "unknown-user"}
                 userName={currentUserProfile?.name || currentUserProfile?.email || "Unknown User"}
-                // Pass all uploaded documents, ExportDocuments will use storagePath for generating signed URLs
-                uploadedDocuments={documents} 
+                uploadedDocuments={documents}
                 onInitiateExport={handleExportDocuments}
-                 // hasDataToExport prop is removed as ExportDocuments can determine this internally
               />
             </CardContent>
           </Card>
@@ -558,5 +581,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
