@@ -2,13 +2,9 @@
 // src/app/api/export-package/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import JSZip from 'jszip';
-import { getBytes, ref as storageRefFirebase } from 'firebase/storage';
-import { storage } from '@/lib/firebase'; // Correctly import storage
+import { getBytes, ref as storageRefFirebase, getDownloadURL } from 'firebase/storage';
+import { storage } from '@/lib/firebase';
 import type { TaxExportCategory, UserUploadedDocForExport } from '@/types';
-// For reading local sample files from 'public' folder in a serverless environment
-import path from 'path';
-import fs from 'fs/promises';
-
 
 interface ExportRequestBody {
   userId: string;
@@ -23,7 +19,7 @@ const sampleDocumentStoragePathMap: Record<TaxExportCategory, string | undefined
   property: 'app_resources/sample_documents/property_KND1150117.pdf',
   social: 'app_resources/sample_documents/social_KND1150130.pdf',
   investments: 'app_resources/sample_documents/investments_KND1150145.pdf',
-  general: undefined, // No specific sample for general export for now
+  general: undefined,
 };
 
 // These are the names that will be used INSIDE the ZIP archive for sample documents
@@ -33,7 +29,7 @@ const sampleDocumentZipNameMap: Record<TaxExportCategory, string | undefined> = 
   property: 'sample_property_KND1150117.pdf',
   social: 'sample_social_KND1150130.pdf',
   investments: 'sample_investments_KND1150145.pdf',
-  general: undefined,
+  general: 'sample_general_guide.txt', // Example for general
 };
 
 
@@ -44,49 +40,48 @@ export async function POST(request: NextRequest) {
     const { userId, category, userDocuments } = body;
 
     console.log(`[API Export] Processing request for user: ${userId}, category: ${category}`);
-    console.log(`[API Export] User documents to fetch via signed URLs:`, userDocuments?.length);
+    console.log(`[API Export] User documents to fetch via signed URLs: ${userDocuments?.length || 0}`);
 
     const zip = new JSZip();
     const userDocumentsFolder = zip.folder("user_documents");
     const sampleDocumentsFolder = zip.folder("sample_documents");
     let overallSuccess = true;
-    let issues = "";
+    let issuesLog = "";
 
     // 1. Fetch user-uploaded documents using Signed URLs
     if (userDocumentsFolder && userDocuments && Array.isArray(userDocuments) && userDocuments.length > 0) {
       for (const docInfo of userDocuments) {
          if (!docInfo.signedUrl || !docInfo.filename) {
           console.warn("[API Export] Encountered an undefined or empty signed URL/filename for user document, skipping.");
-          issues += `Skipped a user document due to missing URL/filename.\n`;
+          issuesLog += `Skipped a user document due to missing URL/filename.\n`;
           overallSuccess = false;
           continue;
         }
         try {
-          console.log(`[API Export] Attempting to fetch user document '${docInfo.filename}' using signed URL: ${docInfo.signedUrl}`);
+          console.log(`[API Export] Attempting to fetch user document '${docInfo.filename}' using signed URL...`);
           const response = await fetch(docInfo.signedUrl);
           if (!response.ok) {
-            throw new Error(`Failed to fetch ${docInfo.filename}: ${response.statusText} (Status: ${response.status})`);
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch ${docInfo.filename}: ${response.statusText} (Status: ${response.status}). Response: ${errorText}`);
           }
           const arrayBuffer = await response.arrayBuffer();
           userDocumentsFolder.file(docInfo.filename, arrayBuffer);
           console.log(`[API Export] Added user document '${docInfo.filename}' to ZIP.`);
         } catch (error) {
-          console.error(`[API Export] Error fetching user document ${docInfo.filename} via signed URL:`, error);
           const errorMessage = `Could not fetch user document: ${docInfo.filename}\nError: ${(error as Error).message}\nVerify the signed URL was valid and accessible.\n\n`;
+          console.error(`[API Export] Error fetching user document ${docInfo.filename} via signed URL:`, (error as Error).message);
           userDocumentsFolder.file(
             `ERROR_FETCHING_${docInfo.filename.replace(/[^a-zA-Z0-9.]/g, '_').substring(0,50)}.txt`,
             errorMessage
           );
-          issues += errorMessage;
+          issuesLog += errorMessage;
           overallSuccess = false;
         }
       }
     } else {
       console.log("[API Export] No user document signed URLs provided or array is empty.");
       if (userDocumentsFolder) {
-        userDocumentsFolder.file("INFO_NO_USER_DOCS.txt", "No user documents were specified for this export or the list was empty.");
-      } else {
-        console.warn("[API Export] userDocumentsFolder is null, cannot add INFO_NO_USER_DOCS.txt");
+        userDocumentsFolder.file("INFO_NO_USER_DOCS_SPECIFIED.txt", "No user documents were specified for this export or the list was empty.");
       }
     }
 
@@ -94,33 +89,48 @@ export async function POST(request: NextRequest) {
     // 2. Fetch the sample KND PDF from Firebase Storage
     const sampleDocStoragePath = sampleDocumentStoragePathMap[category];
     const zipSampleDocFilename = sampleDocumentZipNameMap[category];
-    let sampleDocErrorMessage = "";
-
+    
     if (sampleDocStoragePath && zipSampleDocFilename && sampleDocumentsFolder) {
       console.log(`[API Export] Attempting to fetch sample document for category '${category}' from Firebase Storage path: ${sampleDocStoragePath}`);
+      let sampleDocErrorMessage = "";
       try {
         const sampleDocRef = storageRefFirebase(storage, sampleDocStoragePath);
-        const sampleDocArrayBuffer = await getBytes(sampleDocRef);
+        const downloadUrl = await getDownloadURL(sampleDocRef);
+        console.log(`[API Export] Got download URL for sample document: ${downloadUrl}`);
+        
+        const sampleDocResponse = await fetch(downloadUrl);
+        if (!sampleDocResponse.ok) {
+          const errorText = await sampleDocResponse.text();
+          throw new Error(`Failed to fetch sample document from URL: ${sampleDocResponse.statusText} (Status: ${sampleDocResponse.status}). Response: ${errorText}`);
+        }
+        const sampleDocArrayBuffer = await sampleDocResponse.arrayBuffer();
         sampleDocumentsFolder.file(zipSampleDocFilename, sampleDocArrayBuffer);
         console.log(`[API Export] Successfully added sample document from Firebase Storage as '${zipSampleDocFilename}' to ZIP.`);
       } catch (error: any) {
-        sampleDocErrorMessage = `Could not fetch sample document from Firebase Storage: ${sampleDocStoragePath}\nError: ${(error as Error).message}\n\nVerify that the file exists at this exact path in your Firebase Storage bucket and that the security rules allow read access. Check for typos and case sensitivity in the path.`;
-        console.error(`[API Export] Error fetching sample document from Firebase Storage path '${sampleDocStoragePath}':`, error);
+        sampleDocErrorMessage = `Could not fetch sample document from Firebase Storage: ${sampleDocStoragePath}\nError: ${(error as Error).message}\n\nVerify that the file exists at this exact path in your Firebase Storage bucket and that the security rules allow read access (e.g., 'allow read: if true;' for app_resources path). Check for typos and case sensitivity in the path.`;
+        console.error(`[API Export] Error fetching sample document from Firebase Storage path '${sampleDocStoragePath}':`, (error as Error).message);
+        
+        let filesInSampleDirMessage = "Could not list files in Firebase Storage samples directory for diagnostics.";
+        // Listing files in a Firebase Storage directory is complex without Admin SDK or specific listing functions.
+        // For now, we rely on the direct fetch attempt and its error.
+
+        const diagnosticContent = `${sampleDocErrorMessage}\n\nDebug Info:\nAttempted Storage Path: ${sampleDocStoragePath}\n(Note: Listing files from a Firebase Storage directory in an API route without Admin SDK is non-trivial. Focus on direct path access and rules.)`;
+        
         const shortErrorFileName = `ERROR_FETCHING_SAMPLE_${category}.txt`;
-        sampleDocumentsFolder.file(shortErrorFileName, sampleDocErrorMessage);
-        issues += sampleDocErrorMessage;
+        sampleDocumentsFolder.file(shortErrorFileName, diagnosticContent);
+        issuesLog += sampleDocErrorMessage;
         overallSuccess = false;
       }
+    } else if (category === 'general' && zipSampleDocFilename && sampleDocumentsFolder) {
+        console.log(`[API Export] For 'general' category, adding a generic sample text file.`);
+        sampleDocumentsFolder.file(zipSampleDocFilename, "This is a general tax guide. Please consult official resources and your uploaded documents for specific details.");
     } else if (sampleDocumentsFolder) {
-        console.log(`[API Export] No specific sample document storage path mapped for category: '${category}'.`);
+        const noSampleMessage = `No specific sample document is configured to be included from Firebase Storage for the category '${category}'. This might be normal for some categories.`;
+        console.log(`[API Export] ${noSampleMessage}`);
         const shortInfoFileName = `INFO_NO_SAMPLE_FOR_CATEGORY_${category}.txt`;
-        sampleDocumentsFolder.file(
-            shortInfoFileName,
-            `No specific sample document is configured to be included from Firebase Storage for the category '${category}'. This might be normal for some categories like 'general'.`
-        );
-    } else {
-        console.warn("[API Export] sampleDocumentsFolder is null, cannot add sample doc info/error file.");
+        sampleDocumentsFolder.file(shortInfoFileName, noSampleMessage);
     }
+
 
     // 3. Add a summary file
     let summaryContent = `TaxWise Export Summary
@@ -128,10 +138,10 @@ User ID: ${userId}
 Category: ${category}
 Export Date: ${new Date().toISOString()}
 Number of user documents attempted: ${userDocuments?.length || 0}
-Sample document attempted (path in Firebase Storage): ${sampleDocStoragePath || 'None for this category'}
+Sample document Firebase Storage path attempted: ${sampleDocStoragePath || 'None for this category'}
 `;
-    if (issues) {
-      summaryContent += `\n--- Issues Encountered ---\n${issues}\n--- End Issues ---\n`;
+    if (issuesLog) {
+      summaryContent += `\n--- Issues Encountered ---\n${issuesLog}\n--- End Issues ---\n`;
     }
     summaryContent += "\nNote: If documents are missing, check for ERROR_FETCHING_...txt files in the ZIP folders for details.";
 
@@ -143,9 +153,9 @@ Sample document attempted (path in Firebase Storage): ${sampleDocStoragePath || 
     const base64Zip = zipBuffer.toString('base64');
     const filename = `taxwise_export_${category || 'general'}_${userId.substring(0,8)}_${Date.now()}.zip`;
     
-    console.log(`[API Export] Successfully generated ZIP. Filename: ${filename}, Success: ${overallSuccess}`);
+    console.log(`[API Export] Successfully generated ZIP. Filename: ${filename}, Overall Success Status: ${overallSuccess}`);
     return NextResponse.json({
-      success: overallSuccess,
+      success: overallSuccess, // Reflects if all parts were successful
       message: overallSuccess ? `Package for category '${category}' generated successfully.` : `Package for category '${category}' generated with some issues. Please check summary.txt and any error files in the ZIP.`,
       downloadUrl: `data:application/zip;base64,${base64Zip}`,
       filename: filename,
@@ -154,9 +164,7 @@ Sample document attempted (path in Firebase Storage): ${sampleDocStoragePath || 
   } catch (error) {
     console.error('[API Export] General error processing export request:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    // Ensure a JSON response even for top-level errors
     return NextResponse.json({ success: false, message: `Server error: ${errorMessage}` }, { status: 500 });
   }
 }
-
     

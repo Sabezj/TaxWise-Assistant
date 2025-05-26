@@ -89,7 +89,7 @@ export function LoginForm() {
          switch(error.code) {
             case "auth/user-not-found":
             case "auth/wrong-password":
-            case "auth/invalid-credential":
+            case "auth/invalid-credential": // Added this case
                 errorMessageKey = "loginForm.error.invalidCredentials";
                 break;
             case "auth/too-many-requests":
@@ -97,6 +97,12 @@ export function LoginForm() {
                 break;
             case "auth/network-request-failed":
                  errorMessageKey = "loginForm.error.networkError";
+                break;
+            case "auth/invalid-email":
+                errorMessageKey = "loginForm.error.authInvalidEmail";
+                break;
+            case "auth/user-disabled":
+                errorMessageKey = "loginForm.error.authUserDisabled";
                 break;
          }
       }
