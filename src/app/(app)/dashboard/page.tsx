@@ -8,7 +8,7 @@ import { DataInputForm } from "@/components/dashboard/data-input-form";
 import { DocumentUpload } from "@/components/dashboard/document-upload";
 import { DeductionSuggestions } from "@/components/dashboard/deduction-suggestions";
 import { ExportDocuments } from "@/components/dashboard/export-documents";
-import type { FinancialData, UploadedDocument, MonetaryAmount, Currency, UserProfile, TaxExportCategory, UserUploadedDocForExport } from "@/types"; // Added TaxExportCategory and UserUploadedDocForExport
+import type { FinancialData, UploadedDocument, MonetaryAmount, Currency, UserProfile, TaxExportCategory, UserUploadedDocForExport } from "@/types";
 import { getDeductionSuggestions, type SuggestionRequestPayload, logUserAction, exportUserDocuments as exportUserDocumentsAction } from "@/lib/actions";
 import type { SuggestDeductionsOutput } from "@/ai/flows/suggest-deductions";
 import { useToast } from "@/hooks/use-toast";
@@ -31,13 +31,11 @@ import { doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, wr
 import type { User } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 
-// Force Git change
 const FINANCIAL_DATA_COLLECTION = "userFinancialData";
 const UPLOADED_DOCS_METADATA_COLLECTION = "userDocumentMetadata";
 
 const getDefaultMonetaryAmount = (value: number = 0, currency: Currency): MonetaryAmount => ({ value, currency });
 
-// Defines the structure of an empty financial data object, used for form reset and initial state.
 const getEmptyFinancialData = (defaultCurrency: Currency): FinancialData => ({
   income: {
     job: getDefaultMonetaryAmount(0, defaultCurrency),
@@ -54,7 +52,6 @@ const getEmptyFinancialData = (defaultCurrency: Currency): FinancialData => ({
     otherExpensesDetails: "",
   }
 });
-
 
 export default function DashboardPage() {
   const { t, currency: globalCurrency } = useI18n();
@@ -83,7 +80,7 @@ export default function DashboardPage() {
         if (docSnap.exists()) {
           setCurrentUserProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
         } else {
-          setCurrentUserProfile(null); // Should not happen if registration creates a profile
+          setCurrentUserProfile(null);
           router.push('/login');
         }
       } else {
@@ -102,37 +99,33 @@ export default function DashboardPage() {
     const loadData = async () => {
       if (!currentUser || !currentUserProfile) {
         setIsLoadingPageData(false);
-        setFinancialData(getEmptyFinancialData(globalCurrency)); // Ensure empty state for non-user or pre-profile load
+        setFinancialData(getEmptyFinancialData(globalCurrency));
         setDocuments([]);
         return;
       }
       setIsLoadingPageData(true);
       try {
-        // Load Financial Data
         const financialDataRef = doc(db, FINANCIAL_DATA_COLLECTION, currentUser.uid);
         const finDocSnap = await getDoc(financialDataRef);
         if (finDocSnap.exists()) {
           setFinancialData(finDocSnap.data() as FinancialData);
         } else {
-          // If no data in Firestore, create and set to initial EMPTY state.
           const emptyData = getEmptyFinancialData(globalCurrency);
           await setDoc(financialDataRef, emptyData);
           setFinancialData(emptyData);
         }
 
-        // Load Documents Metadata
         const userDocsMetaRef = doc(db, UPLOADED_DOCS_METADATA_COLLECTION, currentUser.uid);
         const docsMetaSnap = await getDoc(userDocsMetaRef);
         if (docsMetaSnap.exists() && docsMetaSnap.data()?.documents) {
           setDocuments(docsMetaSnap.data()?.documents as UploadedDocument[]);
         } else {
           setDocuments([]);
-          // Create an empty doc metadata if it doesn't exist to avoid issues on first upload
            await setDoc(userDocsMetaRef, { documents: [] });
         }
       } catch (error) {
         console.error("Error loading user data from Firestore:", error);
-        setFinancialData(getEmptyFinancialData(globalCurrency)); // Fallback on error
+        setFinancialData(getEmptyFinancialData(globalCurrency));
         setDocuments([]);
         toast({ title: t("dashboard.toast.loadErrorFirestore"), description: (error as Error).message, variant: "destructive" });
       }
@@ -141,13 +134,12 @@ export default function DashboardPage() {
 
     if (isMounted && currentUser && currentUserProfile) {
       loadData();
-    } else if (!currentUser && isMounted) { // Handles case where user logs out
+    } else if (!currentUser && isMounted) {
       setIsLoadingPageData(false);
       setFinancialData(getEmptyFinancialData(globalCurrency));
       setDocuments([]);
     }
   }, [currentUser, currentUserProfile, isMounted, toast, t, globalCurrency]);
-
 
   const handleFinancialDataSubmit = useCallback(async (data: FinancialData) => {
     if (!currentUser || !currentUserProfile) {
@@ -157,7 +149,7 @@ export default function DashboardPage() {
     setIsSubmittingFinancialData(true);
     try {
       const financialDataRef = doc(db, FINANCIAL_DATA_COLLECTION, currentUser.uid);
-      await setDoc(financialDataRef, data); // This will create if not exists, or overwrite
+      await setDoc(financialDataRef, data);
       setFinancialData(data);
       await logUserAction(currentUser.uid, currentUserProfile.name || currentUserProfile.email || "User", "Financial Data Saved");
       toast({
@@ -190,16 +182,16 @@ export default function DashboardPage() {
       const fileRef = ref(storage, storagePath);
       try {
         await uploadBytes(fileRef, file);
-        // const downloadURL = await getDownloadURL(fileRef); // We can get URL immediately if needed
+
         const newDocMetadata: UploadedDocument = {
-          id: uniqueFileName, // Using uniqueFileName as ID for simplicity here
+          id: uniqueFileName,
           name: file.name,
           type: file.type,
           size: file.size,
           storagePath: storagePath,
-          // downloadURL: downloadURL, // Optionally store it
+
         };
-        // Atomically add the new document metadata to the 'documents' array in Firestore
+
         await updateDoc(userDocsMetaRef, {
           documents: arrayUnion(newDocMetadata)
         });
@@ -234,9 +226,9 @@ export default function DashboardPage() {
     const userDocsMetaRef = doc(db, UPLOADED_DOCS_METADATA_COLLECTION, currentUser.uid);
     try {
       await deleteFirebaseStorageObject(fileRef);
-      // Atomically remove the document metadata from the 'documents' array in Firestore
+
       await updateDoc(userDocsMetaRef, {
-        documents: arrayRemove(docToRemove) // arrayRemove needs the exact object to remove
+        documents: arrayRemove(docToRemove)
       });
       setDocuments(prevDocs => prevDocs.filter(d => d.id !== docToRemove.id));
       await logUserAction(currentUser.uid, currentUserProfile.name || currentUserProfile.email || "User", "Document Removed", `File: ${docToRemove.name}`);
@@ -246,7 +238,6 @@ export default function DashboardPage() {
       toast({ title: t("dashboard.documentUpload.toast.docRemoveErrorTitle"), description: (error as Error).message, variant: "destructive" });
     }
   }, [currentUser, currentUserProfile, toast, t]);
-
 
   const handleGetSuggestions = async () => {
     if (!currentUser || !currentUserProfile) {
@@ -273,10 +264,8 @@ export default function DashboardPage() {
         if (!docMeta.storagePath) continue;
         try {
           const fileRef = ref(storage, docMeta.storagePath);
-          // const downloadURL = await getDownloadURL(fileRef); // Get download URL
-          // const response = await fetch(downloadURL); // Fetch the file using the URL
-          // const blob = await response.blob(); // Get blob
-          const blob = await getBlob(fileRef); // More direct way to get blob
+
+          const blob = await getBlob(fileRef);
           const dataUrl = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result as string);
@@ -289,9 +278,8 @@ export default function DashboardPage() {
           toast({title: t("dashboard.toast.fetchErrorDocAI", { name: docMeta.name }), description: (error as Error).message, variant: "destructive"})
         }
       }
-       toast.dismiss(); // Dismiss "preparing" toast
+       toast.dismiss();
     }
-
 
     const payload: SuggestionRequestPayload = {
       financialData,
@@ -327,18 +315,16 @@ export default function DashboardPage() {
     try {
       const batch = writeBatch(db);
 
-      // Clear Financial Data
       const financialDataRef = doc(db, FINANCIAL_DATA_COLLECTION, currentUser.uid);
       const emptyFinData = getEmptyFinancialData(globalCurrency);
-      batch.set(financialDataRef, emptyFinData); // Use set to overwrite with empty
+      batch.set(financialDataRef, emptyFinData);
       setFinancialData(emptyFinData);
 
       setSuggestions(undefined);
       setSuggestionError(null);
 
-      // Clear Documents Metadata from Firestore and delete files from Storage
       const userDocsMetaRef = doc(db, UPLOADED_DOCS_METADATA_COLLECTION, currentUser.uid);
-      batch.set(userDocsMetaRef, { documents: [] }); // Reset documents array in Firestore
+      batch.set(userDocsMetaRef, { documents: [] });
 
       for (const docMeta of documents) {
         if (!docMeta.storagePath) continue;
@@ -396,15 +382,13 @@ export default function DashboardPage() {
         }
     }
 
-
     return exportUserDocumentsAction(
         currentUser.uid,
         currentUserProfile.name || currentUserProfile.email || "User",
         category,
-        docsToActuallyExport // Pass documents with signed URLs
+        docsToActuallyExport
     );
   }, [currentUser, currentUserProfile, documents, toast, t]);
-
 
   if (!isMounted || isLoadingPageData || !currentUser || !currentUserProfile) {
     return (
@@ -441,7 +425,6 @@ export default function DashboardPage() {
   };
 
   const hasAnyDataForClearButton = !isFinancialDataEffectivelyEmptyForSave(financialData) || documents.length > 0 || !!suggestions;
-
 
   return (
     <div className="container mx-auto py-8 px-4 md:px-0">
@@ -520,7 +503,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
-
 
         <div className="lg:col-span-1 space-y-8">
            <Card className="shadow-lg sticky top-20">

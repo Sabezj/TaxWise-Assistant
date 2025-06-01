@@ -17,7 +17,6 @@ import type { User } from "firebase/auth";
 import { logUserAction } from '@/lib/actions';
 import { useRouter } from 'next/navigation';
 
-
 const defaultSettings: UserSettings = {
   theme: "system",
   notificationsEnabled: true,
@@ -26,22 +25,22 @@ const defaultSettings: UserSettings = {
 };
 
 export default function SettingsPage() {
-  const { 
-    t, 
-    language: globalLanguage, 
-    setLanguage: setGlobalLanguage, 
-    currency: globalCurrency, 
-    setCurrency: setGlobalDisplayCurrency 
+  const {
+    t,
+    language: globalLanguage,
+    setLanguage: setGlobalLanguage,
+    currency: globalCurrency,
+    setCurrency: setGlobalDisplayCurrency
   } = useI18n();
-  
+
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null); // Store full profile
-  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true); // For auth check
+  const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
 
   const [theme, setTheme] = useState<Theme>(defaultSettings.theme);
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(defaultSettings.notificationsEnabled);
   const [selectedDisplayCurrency, setSelectedDisplayCurrency] = useState<Currency>(defaultSettings.displayCurrency);
-  
+
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const { toast } = useToast();
@@ -56,20 +55,18 @@ export default function SettingsPage() {
         if (docSnap.exists()) {
           setCurrentUserProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
         } else {
-          // Fallback or redirect if profile doesn't exist, though it should after login/register
-          setCurrentUserProfile(null); // Or handle more gracefully
-          router.push('/login'); // Example redirect
+          setCurrentUserProfile(null);
+          router.push('/login');
         }
       } else {
         setCurrentUser(null);
         setCurrentUserProfile(null);
-        router.push('/login'); 
+        router.push('/login');
       }
       setIsLoadingPermissions(false);
     });
     return () => unsubscribe();
   }, [router]);
-
 
   useEffect(() => {
     if (isLoadingPermissions || !currentUser) {
@@ -87,7 +84,7 @@ export default function SettingsPage() {
           setTheme(firestoreSettings.theme || defaultSettings.theme);
           setNotificationsEnabled(firestoreSettings.notificationsEnabled !== undefined ? firestoreSettings.notificationsEnabled : defaultSettings.notificationsEnabled);
           setSelectedDisplayCurrency(firestoreSettings.displayCurrency || globalCurrency || defaultSettings.displayCurrency);
-          // Language is set by I18nProvider based on Firestore/localStorage
+
           if (firestoreSettings.language && firestoreSettings.language !== globalLanguage) {
             setGlobalLanguage(firestoreSettings.language);
           }
@@ -95,16 +92,15 @@ export default function SettingsPage() {
             setGlobalDisplayCurrency(firestoreSettings.displayCurrency);
           }
         } else {
-          // User has logged in, but no settings doc yet. Use defaults from context/localStorage and save.
           setTheme(defaultSettings.theme);
           setNotificationsEnabled(defaultSettings.notificationsEnabled);
           setSelectedDisplayCurrency(globalCurrency || defaultSettings.displayCurrency);
           setGlobalLanguage(globalLanguage || defaultSettings.language);
           await setDoc(settingsRef, {
             ...defaultSettings,
-            language: globalLanguage || defaultSettings.language, 
-            displayCurrency: globalCurrency || defaultSettings.displayCurrency 
-          }); 
+            language: globalLanguage || defaultSettings.language,
+            displayCurrency: globalCurrency || defaultSettings.displayCurrency
+          });
         }
       } catch (error) {
         console.error("Error loading settings from Firestore:", error);
@@ -118,13 +114,12 @@ export default function SettingsPage() {
     loadSettings();
   }, [currentUser, isLoadingPermissions, t, toast, globalCurrency, globalLanguage, setGlobalLanguage, setGlobalDisplayCurrency]);
 
-
   useEffect(() => {
     setSelectedDisplayCurrency(globalCurrency);
   }, [globalCurrency]);
 
   useEffect(() => {
-    if (isLoadingSettings || isLoadingPermissions) return; 
+    if (isLoadingSettings || isLoadingPermissions) return;
     if (typeof window === 'undefined') return;
 
     const root = document.documentElement;
@@ -138,7 +133,6 @@ export default function SettingsPage() {
     }
   }, [theme, isLoadingSettings, isLoadingPermissions]);
 
-
   const handleSaveChanges = async () => {
     if (!currentUser || !currentUserProfile) {
       toast({ title: t("errors.notAuthenticated"), description: t("errors.notAuthenticatedDescription"), variant: "destructive" });
@@ -149,19 +143,18 @@ export default function SettingsPage() {
       theme,
       notificationsEnabled,
       displayCurrency: selectedDisplayCurrency,
-      language: globalLanguage, 
+      language: globalLanguage,
     };
     try {
       const settingsRef = doc(db, "userSettings", currentUser.uid);
       await setDoc(settingsRef, settingsToSave, { merge: true });
 
       setGlobalDisplayCurrency(selectedDisplayCurrency);
-      // setGlobalLanguage is handled by I18nProvider for immediate UI, Firestore saves for persistence
 
       await logUserAction(
-        currentUser.uid, 
-        currentUserProfile.name || currentUserProfile.email, 
-        "Settings Saved", 
+        currentUser.uid,
+        currentUserProfile.name || currentUserProfile.email || "Unknown User",
+        "Settings Saved",
         `Theme: ${theme}, Notifications: ${notificationsEnabled}, Currency: ${selectedDisplayCurrency}, Language: ${globalLanguage}`
       );
 
@@ -182,7 +175,7 @@ export default function SettingsPage() {
     { value: "RUB", labelKey: "settingsPage.currency.rub", icon: RussianRuble },
   ];
 
-  if (isLoadingPermissions || isLoadingSettings || !currentUserProfile) { // Check currentUserProfile as well
+  if (isLoadingPermissions || isLoadingSettings || !currentUserProfile) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-0 flex items-center justify-center h-[calc(100vh-10rem)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

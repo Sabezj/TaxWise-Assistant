@@ -22,11 +22,10 @@ import { useI18n } from '@/contexts/i18n-context';
 import { format, subYears, subMonths, subDays } from 'date-fns';
 import { enUS, ru } from 'date-fns/locale';
 
-
 const mockHistoryData: TaxHistoryEntry[] = [
   {
     id: "1",
-    date: subMonths(subYears(new Date(), 1), 3).toISOString(), // Approx March 15 last year
+    date: subMonths(subYears(new Date(), 1), 3).toISOString(),
     year: new Date().getFullYear() - 1,
     type: "Annual Filing",
     status: "Submitted",
@@ -35,7 +34,7 @@ const mockHistoryData: TaxHistoryEntry[] = [
   },
   {
     id: "2",
-    date: subMonths(subYears(new Date(), 1), 9).toISOString(), // Approx Sep 15 last year
+    date: subMonths(subYears(new Date(), 1), 9).toISOString(),
     year: new Date().getFullYear() - 1,
     type: "Quarterly Estimate",
     status: "Reviewed",
@@ -43,7 +42,7 @@ const mockHistoryData: TaxHistoryEntry[] = [
   },
   {
     id: "3",
-    date: subMonths(subYears(new Date(), 2), 4).toISOString(), // Approx April 10 two years ago
+    date: subMonths(subYears(new Date(), 2), 4).toISOString(),
     year: new Date().getFullYear() - 2,
     type: "Annual Filing",
     status: "Amended",
@@ -52,7 +51,7 @@ const mockHistoryData: TaxHistoryEntry[] = [
   },
   {
     id: "4",
-    date: subMonths(subYears(new Date(), 3), 10).toISOString(), // Approx Oct 20 three years ago
+    date: subMonths(subYears(new Date(), 3), 10).toISOString(),
     year: new Date().getFullYear() - 3,
     type: "Annual Filing",
     status: "Submitted",
@@ -60,7 +59,7 @@ const mockHistoryData: TaxHistoryEntry[] = [
   },
   {
     id: "5",
-    date: subMonths(subYears(new Date(), 0), 1).toISOString(), // Last month, current year
+    date: subMonths(subYears(new Date(), 0), 1).toISOString(),
     year: new Date().getFullYear(),
     type: "Quarterly Estimate",
     status: "Draft",
@@ -68,7 +67,7 @@ const mockHistoryData: TaxHistoryEntry[] = [
   },
   {
     id: "6",
-    date: subMonths(subYears(new Date(), 2), 1).toISOString(), // January, two years ago
+    date: subMonths(subYears(new Date(), 2), 1).toISOString(),
     year: new Date().getFullYear() - 2,
     type: "Quarterly Estimate",
     status: "Reviewed",
@@ -109,9 +108,8 @@ export function TaxHistoryList() {
   const { t, language, formatCurrency } = useI18n();
   const dateLocale = language === 'ru' ? ru : enUS;
 
-
   useEffect(() => {
-    console.log("TaxHistoryList: Setting mock history data. If you see this, the component is trying to load its mock data."); // Diagnostic log
+    console.log("TaxHistoryList: Setting mock history data. If you see this, the component is trying to load its mock data.");
     setTimeout(() => {
        const sortedInitialHistory = mockHistoryData.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setHistory(sortedInitialHistory);
@@ -308,5 +306,3 @@ export function TaxHistoryList() {
     </>
   );
 }
-
-    

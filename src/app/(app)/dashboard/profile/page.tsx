@@ -23,7 +23,7 @@ import { useRouter } from 'next/navigation';
 const CreateGroupDialog: React.FC<{
   userId: string;
   userName: string;
-  onGroupCreated: () => void; 
+  onGroupCreated: () => void;
 }> = ({ userId, userName, onGroupCreated }) => {
   const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
@@ -55,8 +55,8 @@ const CreateGroupDialog: React.FC<{
       });
       setIsOpen(false);
       setGroupName("");
-      onGroupCreated(); 
-      router.push('/dashboard/admin/users'); 
+      onGroupCreated();
+      router.push('/dashboard/admin/users');
     }
   };
 
@@ -99,7 +99,6 @@ const CreateGroupDialog: React.FC<{
   );
 };
 
-
 export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -109,7 +108,6 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const { t } = useI18n();
   const [keyForProfileForm, setKeyForProfileForm] = useState(Date.now());
-
 
   const fetchUserProfile = useCallback(async (fbUser: User | null) => {
     if (!fbUser) {
@@ -129,12 +127,12 @@ export default function ProfilePage() {
           name: fbUser.displayName || "New User",
           email: fbUser.email || "user@example.com",
           avatarUrl: fbUser.photoURL || `https://placehold.co/100x100.png?text=${fbUser.displayName?.charAt(0) || fbUser.email?.charAt(0)?.toUpperCase() || 'U'}`,
-          role: fbUser.email === "sabezj1@gmail.com" ? "superadmin" : "user", // Ensure superadmin role on creation
+          role: fbUser.email === "sabezj1@gmail.com" ? "superadmin" : "user",
           createdAt: new Date().toISOString(),
         };
-        await setDoc(userProfileRef, { 
-          name: initialProfile.name, 
-          email: initialProfile.email, 
+        await setDoc(userProfileRef, {
+          name: initialProfile.name,
+          email: initialProfile.email,
           avatarUrl: initialProfile.avatarUrl,
           role: initialProfile.role,
           createdAt: initialProfile.createdAt,
@@ -144,10 +142,10 @@ export default function ProfilePage() {
     } catch (error) {
       console.error("Error fetching user profile from Firestore:", error);
       toast({ title: t("profilePage.toast.loadError"), description: t("profilePage.toast.loadErrorDescription", {error: (error as Error).message}), variant: "destructive" });
-       setUserProfile({ 
-            id: fbUser.uid, 
-            name: fbUser.displayName || "Error User", 
-            email: fbUser.email || "error@example.com", 
+       setUserProfile({
+            id: fbUser.uid,
+            name: fbUser.displayName || "Error User",
+            email: fbUser.email || "error@example.com",
             avatarUrl: fbUser.photoURL,
             role: 'user'
         });
@@ -155,7 +153,6 @@ export default function ProfilePage() {
     setIsLoading(false);
     setKeyForProfileForm(Date.now());
   }, [t, toast]);
-
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (fbUser) => {
@@ -178,17 +175,15 @@ export default function ProfilePage() {
 
   const handleUpdateProfile = useCallback(async (data: Pick<UserProfile, 'name' | 'email'>) => {
     if (!currentUser || !userProfile) return;
-    
+
     let details = "";
     if (data.name !== userProfile.name) details += `Name changed from "${userProfile.name}" to "${data.name}". `;
-    // Email changes are usually handled differently, but if allowed:
-    // if (data.email !== userProfile.email) details += `Email changed from "${userProfile.email}" to "${data.email}". `;
-    
+
     const profileDataToSave: Partial<UserProfile> = { name: data.name, avatarUrl: userProfile.avatarUrl };
-        
+
     const updates: { displayName?: string; } = {};
     if (data.name !== currentUser.displayName) updates.displayName = data.name;
-    
+
     try {
       if (updates.displayName) {
         await updateFirebaseAuthProfile(currentUser, { displayName: updates.displayName });
@@ -200,7 +195,7 @@ export default function ProfilePage() {
     } catch (error) {
         console.error("Error updating profile:", error);
         toast({ title: t("profilePage.form.toast.updateFailed"), description: (error as Error).message, variant: "destructive"});
-        throw error; 
+        throw error;
     }
   }, [currentUser, userProfile, t, toast]);
 
@@ -215,7 +210,7 @@ export default function ProfilePage() {
         const updatedProfileData = { avatarUrl: newAvatarUrl };
         await updateFirebaseAuthProfile(currentUser, { photoURL: newAvatarUrl });
         await saveUserProfileToFirestore(currentUser.uid, updatedProfileData);
-        
+
         await logUserAction(currentUser.uid, userProfile.name, "Avatar Changed", `Old URL: ${oldAvatarUrl}, New URL: ${newAvatarUrl}`);
         toast({ title: t("profilePage.toast.avatarUpdated"), description: t("profilePage.toast.avatarUpdatedDescription") });
         setIsAvatarDialogOpen(false);
@@ -230,7 +225,7 @@ export default function ProfilePage() {
 
   const handleGroupCreated = () => {
     if (currentUser) {
-      fetchUserProfile(currentUser); 
+      fetchUserProfile(currentUser);
     }
   };
 
@@ -297,7 +292,7 @@ export default function ProfilePage() {
                 </DialogContent>
               </Dialog>
               {userProfile.role === 'user' && currentUser && (
-                 <CreateGroupDialog userId={currentUser.uid} userName={userProfile.name || userProfile.email} onGroupCreated={handleGroupCreated} />
+                 <CreateGroupDialog userId={currentUser.uid} userName={userProfile.name || userProfile.email || "Unknown User"} onGroupCreated={handleGroupCreated} />
               )}
             </CardContent>
           </Card>

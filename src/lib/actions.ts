@@ -5,8 +5,7 @@ import { suggestDeductions as suggestDeductionsFlow, type SuggestDeductionsInput
 import type { FinancialData, TaxExportCategory, Group, CreateGroupInput, AdminCreateUserInput, AdminCreateUserResult, UserRole, UploadedDocument, AuditLogAction, AuditLogEntry, UserUploadedDocForExport } from "@/types";
 import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, setDoc, query, orderBy, getDocs, limit as firestoreLimit, arrayUnion } from "firebase/firestore";
 import { createUserWithEmailAndPassword, updateProfile as updateFirebaseAuthProfile } from "firebase/auth";
-import { db, auth as firebaseAuth } from "./firebase"; // firebaseAuth alias for clarity
-
+import { db, auth as firebaseAuth } from "./firebase";
 
 export interface SuggestionRequestPayload {
   financialData: FinancialData;
@@ -32,7 +31,6 @@ export async function logUserAction(
     console.error("Error logging user action:", error);
   }
 }
-
 
 export async function getDeductionSuggestions(userId: string, userName: string, payload: SuggestionRequestPayload): Promise<SuggestDeductionsOutput | { error: string }> {
   try {
@@ -69,12 +67,11 @@ export async function getDeductionSuggestions(userId: string, userName: string, 
   }
 }
 
-
 export async function exportUserDocuments(
   userId: string,
   userName: string,
   category: TaxExportCategory,
-  userDocuments: UserUploadedDocForExport[] // Changed from documentStoragePaths
+  userDocuments: UserUploadedDocForExport[]
 ): Promise<{ downloadUrl?: string; filename?: string; error?: string; message?: string }> {
 
   const apiUrl = process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/api/export-package` : `/api/export-package`;
@@ -86,7 +83,7 @@ export async function exportUserDocuments(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId, category, userDocuments }), // Pass userDocuments directly
+      body: JSON.stringify({ userId, category, userDocuments }),
     });
 
     if (!response.ok) {
@@ -97,7 +94,7 @@ export async function exportUserDocuments(
     }
 
     const result = await response.json();
-    
+
     if (result.success) {
       await logUserAction(userId, userName, "Document Exported", `Success. Category: ${category}, Filename: ${result.filename}`);
       return { downloadUrl: result.downloadUrl, filename: result.filename, message: result.message };
@@ -114,20 +111,19 @@ export async function exportUserDocuments(
   }
 }
 
-
 export async function createGroupAction(input: CreateGroupInput): Promise<{ group?: Group; error?: string }> {
   try {
     const groupsCollectionRef = collection(db, "groups");
-    const newGroupDocRef = doc(groupsCollectionRef); // Create a new doc ref to get ID first
-    
+    const newGroupDocRef = doc(groupsCollectionRef);
+
     const newGroup: Group = {
       id: newGroupDocRef.id,
       name: input.name,
       adminId: input.creatorId,
       memberIds: [input.creatorId],
-      createdAt: new Date().toISOString(), // Use ISO string for client consistency
+      createdAt: new Date().toISOString(),
     };
-    await setDoc(newGroupDocRef, { ...newGroup, createdAt: serverTimestamp() }); // Use serverTimestamp for Firestore
+    await setDoc(newGroupDocRef, { ...newGroup, createdAt: serverTimestamp() });
 
     const userProfileRef = doc(db, "userProfiles", input.creatorId);
     const userProfileSnap = await getDoc(userProfileRef);
@@ -162,14 +158,12 @@ export async function adminCreateUserAction(
     if (!newUserDetails.password) {
         return { success: false, error: "Password is required to create a new user." };
     }
-    // Create user in Firebase Authentication
+
     const userCredential = await createUserWithEmailAndPassword(firebaseAuth, newUserDetails.email, newUserDetails.password);
     const newUser = userCredential.user;
 
-    // Update Firebase Auth profile
     await updateFirebaseAuthProfile(newUser, { displayName: newUserDetails.name });
 
-    // Create user profile document in Firestore
     const userProfileRef = doc(db, "userProfiles", newUser.uid);
     const userRoleToSet: UserRole = newUserDetails.role || 'user';
 
@@ -182,7 +176,6 @@ export async function adminCreateUserAction(
       createdAt: new Date().toISOString(),
     });
 
-    // Create default settings document in Firestore
     const userSettingsRef = doc(db, "userSettings", newUser.uid);
     await setDoc(userSettingsRef, {
       theme: "system",
@@ -191,7 +184,6 @@ export async function adminCreateUserAction(
       language: "en",
     });
 
-    // If a groupId is provided (meaning a group admin created this user), add user to that group
     if (groupId) {
       const groupRef = doc(db, "groups", groupId);
       const groupSnap = await getDoc(groupRef);

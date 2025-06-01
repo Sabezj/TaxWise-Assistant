@@ -1,3 +1,4 @@
+
 import { RegisterForm } from "@/components/auth/register-form";
 import type { Metadata } from "next";
 

@@ -63,7 +63,6 @@ export function DeductionSuggestions({ suggestions, isLoading, error }: Deductio
     );
   }
 
-
   return (
     <div className="space-y-4">
       {suggestions.summary && (
@@ -97,6 +96,3 @@ export function DeductionSuggestions({ suggestions, isLoading, error }: Deductio
     </div>
   );
 }
-
-
-    

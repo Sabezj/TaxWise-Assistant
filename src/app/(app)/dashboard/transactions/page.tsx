@@ -69,7 +69,6 @@ export default function TransactionsPage() {
     loadFinancialData();
   }, [currentUser, displayCurrency, isLoadingI18nSettings, isMounted]);
 
-
   const convertedFinancialData = useMemo(() => {
     if (!financialData || !currencyRates) return null;
     const convertCat = (category: MonetaryAmount) => convertCurrency(category, displayCurrency, currencyRates);
@@ -104,8 +103,7 @@ export default function TransactionsPage() {
           categoryLabelKey: `chartLabels.income.${key}`,
           originalValue: financialData.income[key].value,
           originalCurrency: financialData.income[key].currency,
-          // @ts-ignore 
-          convertedValue: convertedFinancialData.income[key]?.value ?? 0,
+          convertedValue: convertedFinancialData.income[key as keyof typeof convertedFinancialData.income]?.value ?? 0,
           displayCurrency: displayCurrency,
         });
       }
@@ -119,15 +117,13 @@ export default function TransactionsPage() {
           categoryLabelKey: `chartLabels.expenses.${key}`,
           originalValue: financialData.expenses[key].value,
           originalCurrency: financialData.expenses[key].currency,
-          // @ts-ignore 
-          convertedValue: convertedFinancialData.expenses[key]?.value ?? 0,
+          convertedValue: convertedFinancialData.expenses[key as keyof typeof convertedFinancialData.expenses]?.value ?? 0,
           displayCurrency: displayCurrency,
         });
       }
     });
-    return items.sort((a, b) => (a.categoryLabelKey.localeCompare(b.categoryLabelKey))); // Sort for consistent order
+    return items.sort((a, b) => (a.categoryLabelKey.localeCompare(b.categoryLabelKey)));
   }, [financialData, convertedFinancialData, displayCurrency]);
-
 
   if (!isMounted || isLoadingFinancialData || isLoadingI18nSettings) {
     return (
@@ -137,7 +133,7 @@ export default function TransactionsPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="container mx-auto py-8 px-4 md:px-0 space-y-8">
       <div>
@@ -196,5 +192,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
-    

@@ -51,31 +51,28 @@ const formSchema = (t: Function, defaultCurrency: Currency) => z.object({
 
 type FormSchemaType = ReturnType<typeof formSchema>;
 
-// Helper to create a default MonetaryAmount, primarily for initialization/reset
-const getDefaultMonetaryAmount = (initialValue: number | undefined = 0, initialCurrency: Currency | undefined, defaultGlobalCurrency: Currency): MonetaryAmount => ({
+const getDefaultMonetaryAmountForForm = (initialValue: number | undefined = 0, initialCurrency: Currency | undefined, defaultGlobalCurrency: Currency): MonetaryAmount => ({
   value: initialValue,
   currency: initialCurrency ?? defaultGlobalCurrency,
 });
 
-// Defines the structure of an empty financial data object, used for form reset and initial state.
 const getEmptyFinancialFormValues = (defaultGlobalCurrency: Currency): z.infer<FormSchemaType> => ({
   income: {
-    job: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
-    investments: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
-    propertyIncome: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
-    credits: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    job: getDefaultMonetaryAmountForForm(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    investments: getDefaultMonetaryAmountForForm(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    propertyIncome: getDefaultMonetaryAmountForForm(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    credits: getDefaultMonetaryAmountForForm(0, defaultGlobalCurrency, defaultGlobalCurrency),
     otherIncomeDetails: "",
   },
   expenses: {
-    medical: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
-    educational: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
-    social: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
-    property: getDefaultMonetaryAmount(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    medical: getDefaultMonetaryAmountForForm(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    educational: getDefaultMonetaryAmountForForm(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    social: getDefaultMonetaryAmountForForm(0, defaultGlobalCurrency, defaultGlobalCurrency),
+    property: getDefaultMonetaryAmountForForm(0, defaultGlobalCurrency, defaultGlobalCurrency),
     otherExpensesDetails: "",
   },
 });
 
-// Populates the form with initialData, or with empty values if initialData is null/undefined.
 const getDefaultValuesForForm = (initialData?: Partial<FinancialData> | null, defaultGlobalCurrency: Currency = 'USD'): z.infer<FormSchemaType> => {
     const emptyState = getEmptyFinancialFormValues(defaultGlobalCurrency);
     return {
@@ -95,7 +92,6 @@ const getDefaultValuesForForm = (initialData?: Partial<FinancialData> | null, de
         },
     };
 };
-
 
 interface DataInputFormProps {
   initialData?: FinancialData | null;
@@ -130,20 +126,18 @@ export function DataInputForm({ initialData, onSubmit, isSubmitting }: DataInput
         expenses.social.value,
         expenses.property.value,
       ];
-      // Check if ALL numeric values are zero or undefined/NaN (though schema defaults to 0)
+
       return ![...allNumericIncomeValues, ...allNumericExpenseValues].some(val => typeof val === 'number' && val > 0);
     };
     setIsFormEffectivelyEmpty(checkFormIsNumericEmpty(watchedValues));
   }, [watchedValues]);
-  
+
   React.useEffect(() => {
     form.reset(getDefaultValuesForForm(initialData, globalCurrency));
   }, [initialData, form, globalCurrency]);
 
-
   const handleFormSubmit = async (values: z.infer<typeof currentFormSchema>) => {
-    await onSubmit(values as FinancialData); // Call parent's submit logic
-    // After successful submission by parent, reset form to a truly empty state
+    await onSubmit(values as FinancialData);
     form.reset(getEmptyFinancialFormValues(globalCurrency));
   };
 
@@ -164,15 +158,15 @@ export function DataInputForm({ initialData, onSubmit, isSubmitting }: DataInput
   const renderMonetaryAmountField = (
     category: 'income' | 'expenses',
     fieldInfo: typeof incomeFields[number] | typeof expenseFields[number],
-    control: any, 
+    control: any,
   ) => {
     const fieldName = `${category}.${fieldInfo.name}` as const;
     return (
       <FormField
         key={fieldName}
         control={control}
-        name={fieldName} // This will now point to an object { value, currency }
-        render={({ field }) => ( // field.value is { value, currency }
+        name={fieldName}
+        render={({ field }) => (
           <FormItem>
             <FormLabel className="flex items-center">
               <fieldInfo.icon className="mr-2 h-4 w-4 text-muted-foreground" /> {t(fieldInfo.labelKey)}
@@ -182,18 +176,18 @@ export function DataInputForm({ initialData, onSubmit, isSubmitting }: DataInput
                 <Input
                   type="number"
                   placeholder={t(fieldInfo.placeholderKey)}
-                  value={field.value.value} // Access .value for the number
+                  value={field.value.value}
                   onChange={(e) => field.onChange({ ...field.value, value: parseFloat(e.target.value) || 0 })}
                   min="0"
-                  step="any" // Allow decimals
+                  step="any"
                 />
               </FormControl>
               <Controller
                 control={control}
-                name={`${fieldName}.currency` as any} // Control the currency part of the object
+                name={`${fieldName}.currency` as any}
                 render={({ field: currencyField }) => (
-                  <Select 
-                    value={currencyField.value} 
+                  <Select
+                    value={currencyField.value}
                     onValueChange={(val) => currencyField.onChange(val as Currency)}
                   >
                     <FormControl>
@@ -213,18 +207,17 @@ export function DataInputForm({ initialData, onSubmit, isSubmitting }: DataInput
               />
             </div>
             <FormDescription>{t(fieldInfo.descKey)}</FormDescription>
-            <FormMessage /> {/* For validation errors on the whole {value, currency} object if any */}
+            <FormMessage />
           </FormItem>
         )}
       />
     );
   };
 
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-8">
-        
+
         <div>
           <h3 className="text-xl font-semibold mb-4 text-foreground">{t("dashboard.dataInputForm.incomeTitle")}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -278,7 +271,7 @@ export function DataInputForm({ initialData, onSubmit, isSubmitting }: DataInput
             )}
           />
         </div>
-        
+
         <Button type="submit" className="w-full md:w-auto mt-8" disabled={isSubmitting || isFormEffectivelyEmpty}>
           {isSubmitting ? (
             <>
@@ -287,7 +280,7 @@ export function DataInputForm({ initialData, onSubmit, isSubmitting }: DataInput
             </>
           ) : (
             <>
-              <Save className="mr-2 h-4 w-4" /> 
+              <Save className="mr-2 h-4 w-4" />
               {t("dashboard.dataInputForm.saveButton")}
             </>
           )}
@@ -296,5 +289,3 @@ export function DataInputForm({ initialData, onSubmit, isSubmitting }: DataInput
     </Form>
   );
 }
-
-    

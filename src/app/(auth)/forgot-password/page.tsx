@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,12 +22,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Mail } from "lucide-react";
 import type { Metadata } from "next";
 
-// export const metadata: Metadata = { // Metadata can't be exported from client components
-//   title: "Forgot Password - TaxWise Assistant",
-//   description: "Reset your TaxWise Assistant account password.",
-// };
-
-
 const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
 });
@@ -45,12 +40,12 @@ export default function ForgotPasswordPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     console.log("Forgot password submitted for email:", values.email);
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     toast({
       title: "Password Reset Email Sent",
       description: "If an account exists for this email, you will receive reset instructions.",
     });
-    // router.push("/login"); // Optionally redirect or stay on page
+
   }
 
   return (

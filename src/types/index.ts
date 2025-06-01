@@ -4,7 +4,6 @@ export type Language = "en" | "ru";
 export type Theme = "light" | "dark" | "system";
 export type UserRole = "user" | "admin" | "superadmin";
 
-
 export interface MonetaryAmount {
   value: number;
   currency: Currency;
@@ -39,19 +38,19 @@ export interface CurrencyRates {
 }
 
 export interface UploadedDocument {
-  id: string; // Firestore document ID or unique identifier
+  id: string;
   name: string;
   type: string;
   size: number;
-  storagePath: string; // Path in Firebase Storage
-  downloadURL?: string; // Optional: if we pre-fetch and store it
+  storagePath: string;
+  downloadURL?: string;
+  dataUrl?: string;
 }
 
 export interface UserUploadedDocForExport {
   filename: string;
   signedUrl: string;
 }
-
 
 export interface DeductionSuggestion {
   category: string;
@@ -107,10 +106,10 @@ export interface DisplayUser extends UserProfile {
 
 export interface AuditLogEntry {
   id: string;
-  timestamp: string; // ISO string on client, Firestore Timestamp on server
-  userId: string | null; // Can be null for system actions
+  timestamp: string;
+  userId: string | null;
   userName: string;
-  action: AuditLogAction; // Use the specific type
+  action: AuditLogAction;
   details?: string;
 }
 
@@ -120,10 +119,9 @@ export interface ExportCategoryDetails {
   value: TaxExportCategory;
   labelKey: string;
   requiredDocsKey: string;
-  sampleDocName?: string; // Filename in Firebase Storage: app_resources/sample_documents/
+  sampleDocName?: string;
   icon?: React.ElementType;
 }
-
 
 export interface TransactionViewItem {
   id: string;
@@ -140,7 +138,7 @@ export interface Group {
   name: string;
   adminId: string;
   memberIds: string[];
-  createdAt: string; // ISO string on client, Firestore Timestamp on server
+  createdAt: string;
 }
 
 export interface CreateGroupInput {
@@ -148,12 +146,11 @@ export interface CreateGroupInput {
   creatorId: string;
 }
 
-// For admin creating a new user
 export interface AdminCreateUserInput {
   name: string;
   email: string;
-  password?: string; // Password is required for creation by admin
-  role?: UserRole; // Optional, defaults to 'user'
+  password?: string;
+  role?: UserRole;
 }
 
 export interface AdminCreateUserResult {
@@ -162,7 +159,6 @@ export interface AdminCreateUserResult {
   userId?: string;
 }
 
-// Audit Log Action type
 export type AuditLogAction =
   | "Login Success"
   | "User Registered"
@@ -178,5 +174,5 @@ export type AuditLogAction =
   | "User Deleted by Admin"
   | "Group Created"
   | "Document Exported"
-  | "Password Reset Requested" // Example of another action
+  | "Password Reset Requested"
   | "All Data Cleared";

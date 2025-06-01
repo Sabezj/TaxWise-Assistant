@@ -11,13 +11,11 @@ import { Label } from '@/components/ui/label';
 import type { TaxExportCategory, ExportCategoryDetails, UploadedDocument, UserUploadedDocForExport } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-// Removed direct Firebase imports as they are not directly used here for URL generation anymore.
-// URL generation is now expected to be handled by the parent (DashboardPage) via onInitiateExport.
 
 interface ExportDocumentsProps {
   userId: string;
   userName: string;
-  uploadedDocuments: UploadedDocument[]; // Used to determine if there's anything to export with
+  uploadedDocuments: UploadedDocument[];
   onInitiateExport: (category: TaxExportCategory, documentsToExport: UserUploadedDocForExport[]) => Promise<{ downloadUrl?: string; filename?: string; error?: string; message?: string }>;
 }
 
@@ -30,19 +28,13 @@ const exportCategories: ExportCategoryDetails[] = [
   { value: "general", labelKey: "exportCategories.general", requiredDocsKey: "exportCategories.generalDocs", icon: Package }
 ];
 
-
 export function ExportDocuments({ userId, userName, uploadedDocuments, onInitiateExport }: ExportDocumentsProps) {
   const [isExporting, setIsExporting] = useState(false);
-  // isPreparingSignedUrls state is removed as URL prep is now handled by parent via onInitiateExport
   const [selectedCategory, setSelectedCategory] = useState<TaxExportCategory | null>(null);
   const { toast } = useToast();
   const { t } = useI18n();
 
-  // Determine if there's any data for export (e.g., uploaded documents)
-  // This component doesn't know about financialData directly, so we rely on uploadedDocuments
-  // Parent (DashboardPage) will disable this whole card/component if there's absolutely no financial data.
   const hasDocumentsToExport = uploadedDocuments.length > 0;
-
 
   const handleExport = async () => {
     if (!selectedCategory) {
@@ -53,36 +45,22 @@ export function ExportDocuments({ userId, userName, uploadedDocuments, onInitiat
       });
       return;
     }
-    
+
     setIsExporting(true);
     toast({
       title: t("dashboard.exportDocuments.toast.exportStarted"),
       description: t("dashboard.exportDocuments.toast.exportStartedDescription"),
     });
 
-    // The parent (DashboardPage) will handle generating signed URLs if needed,
-    // and then call the actual exportUserDocumentsAction.
-    // For this component, we just need to pass the intent and the category.
-    // The `docsToExport` (which are UserUploadedDocForExport[]) will be prepared by onInitiateExport.
-    // Here, we assume onInitiateExport expects the raw uploadedDocuments to process.
-    // The parent will map these to UserUploadedDocForExport[] with signed URLs.
-    // Let's adjust this slightly: onInitiateExport should take just the category,
-    // and the parent will prepare the UserUploadedDocForExport[] list.
-    // OR, onInitiateExport in DashboardPage is already doing this.
-    // This component calls `onInitiateExport` which is `handleExportDocuments` in DashboardPage.
-    // That function in DashboardPage will create the UserUploadedDocForExport[].
-    // So, this component just needs to call it.
-
-    // The actual `docsToExport` (containing signed URLs) are now prepared by the `onInitiateExport`
-    // function passed from `DashboardPage`. This component doesn't need to know about storage paths.
     try {
-      const result = await onInitiateExport(selectedCategory, []); // Pass empty array, parent prepares docs with signed URLs
+
+      const result = await onInitiateExport(selectedCategory, []);
 
       if (result.downloadUrl && result.filename) {
          toast({
             title: t("dashboard.exportDocuments.toast.exportReady"),
             description: result.message || t("dashboard.exportDocuments.toast.exportReadyDescription"),
-            duration: 7000, 
+            duration: 7000,
             action: (
                 <Button variant="outline" size="sm" asChild>
                     <a href={result.downloadUrl} download={result.filename}>
@@ -101,7 +79,7 @@ export function ExportDocuments({ userId, userName, uploadedDocuments, onInitiat
          toast({
             title: t("dashboard.exportDocuments.toast.exportUnexpectedError"),
             description: result.message || t("dashboard.exportDocuments.toast.exportUnexpectedErrorDescription"),
-            variant: "default", // Changed from "destructive" to "default" for non-critical errors
+            variant: "default",
         });
       }
 
@@ -126,7 +104,7 @@ export function ExportDocuments({ userId, userName, uploadedDocuments, onInitiat
         <Select
           value={selectedCategory || ""}
           onValueChange={(value) => setSelectedCategory(value as TaxExportCategory)}
-          disabled={isExporting /* No longer disable based on hasDocumentsToExport here, parent handles overall card visibility */}
+          disabled={isExporting }
         >
           <SelectTrigger id="export-category" className="w-full">
             <SelectValue placeholder={t("dashboard.exportDocuments.selectCategoryPlaceholder")} />
@@ -143,7 +121,6 @@ export function ExportDocuments({ userId, userName, uploadedDocuments, onInitiat
             })}
           </SelectContent>
          </Select>
-         {/* Simplified hint, actual data check is on DashboardPage for enabling Export card */}
          {!hasDocumentsToExport && !selectedCategory && (
             <p className="text-xs text-muted-foreground mt-1">
                 {t("dashboard.exportDocuments.uploadDocsToEnableExport")}
@@ -181,7 +158,7 @@ export function ExportDocuments({ userId, userName, uploadedDocuments, onInitiat
 
       <Button
         onClick={handleExport}
-        disabled={isExporting || !selectedCategory /* Button is active if category selected, overall card visibility controlled by parent */}
+        disabled={isExporting || !selectedCategory }
         className="w-full"
         size="lg"
       >
@@ -205,5 +182,3 @@ export function ExportDocuments({ userId, userName, uploadedDocuments, onInitiat
     </div>
   );
 }
-
-    

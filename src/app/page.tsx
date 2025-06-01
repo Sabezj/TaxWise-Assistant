@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ArrowRight, LogIn, UserPlus } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { useI18n } from "@/contexts/i18n-context"; // Import useI18n
+import { useI18n } from "@/contexts/i18n-context";
 import { useEffect, useState } from "react";
 
 export default function LandingPage() {
@@ -16,7 +16,6 @@ export default function LandingPage() {
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
   }, []);
-
 
   return (
     <div className="flex flex-col min-h-screen">

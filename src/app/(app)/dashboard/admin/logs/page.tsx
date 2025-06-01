@@ -5,19 +5,18 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { ShieldAlert, Eye, Filter, Loader2, ArrowDownUp } from "lucide-react";
-import type { AuditLogEntry, UserProfile } from "@/types"; // Added UserProfile
+import type { AuditLogEntry, UserProfile } from "@/types";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format, subDays, subHours, subMinutes } from 'date-fns';
 import { useI18n } from '@/contexts/i18n-context';
 import { enUS, ru } from 'date-fns/locale';
-import { getAuditLogs, logUserAction } from '@/lib/actions'; // Import getAuditLogs
-import { auth, db } from "@/lib/firebase"; // Import auth for current user
-import { doc, getDoc } from "firebase/firestore"; // Import getDoc
+import { getAuditLogs, logUserAction } from '@/lib/actions';
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import type { User as FirebaseUser } from 'firebase/auth';
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useRouter } from 'next/navigation';
 
-// Mock action translations are no longer needed if actions are logged with consistent keys
 const getTranslatedAction = (actionKey: string, t: Function): string => {
   const keyMap: Record<string, string> = {
     "Login Success": "auditLogActions.loginSuccess",
@@ -35,21 +34,25 @@ const getTranslatedAction = (actionKey: string, t: Function): string => {
     "Group Created": "auditLogActions.groupCreated",
     "Document Exported": "auditLogActions.documentExported",
   };
-  return t(keyMap[actionKey] || actionKey); 
+  return t(keyMap[actionKey] || actionKey);
 };
 
 const getTranslatedLogDetail = (detailString: string | undefined, t: Function): string => {
   if (!detailString) return t('adminLogsPage.viewDetails.alert.detailsNotAvailable');
-  // For dynamic details, direct translation isn't feasible.
-  // We can translate prefixes if they are consistent.
-  // Example: If details always start "User: John Doe...", you could translate "User:".
-  // For now, we return the detail string as is, assuming it's logged in the desired language or is user-generated content.
+  if (detailString === "Logged in via email/password.") return t("adminLogsPage.details.mock.loggedInEmailPassword");
+  if (detailString.startsWith("Theme:")) return t("adminLogsPage.details.mock.settingsSaved", {
+    theme: detailString.match(/Theme: (\w+)/)?.[1] || "",
+    notifications: detailString.match(/Notifications: (\w+)/)?.[1] || "",
+    currency: detailString.match(/Currency: (\w+)/)?.[1] || "",
+    language: detailString.match(/Language: (\w+)/)?.[1] || ""
+  });
+  if (detailString.startsWith("File:")) return t("adminLogsPage.details.mock.docUploaded", { fileName: detailString.substring(6) });
+
   return detailString;
 };
 
 type SortKey = keyof AuditLogEntry | null;
 type SortDirection = 'asc' | 'desc';
-
 
 export default function AdminLogsPage() {
   const { t, language } = useI18n();
@@ -58,7 +61,7 @@ export default function AdminLogsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>('timestamp');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  
+
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
@@ -76,9 +79,9 @@ export default function AdminLogsPage() {
           const profile = { id: docSnap.id, ...docSnap.data() } as UserProfile;
           setCurrentUserProfile(profile);
           if (profile.role !== 'admin' && profile.role !== 'superadmin') {
-            router.push('/dashboard'); 
+            router.push('/dashboard');
           } else {
-            fetchLogs(); // Fetch logs only if authorized
+            fetchLogs();
           }
         } else {
            router.push('/dashboard');
@@ -91,11 +94,11 @@ export default function AdminLogsPage() {
       setIsLoadingPermissions(false);
     });
     return () => unsubscribe();
-  }, [router]); // Added router to dependency array
+  }, [router]);
 
   const fetchLogs = async () => {
     setIsLoading(true);
-    const fetchedLogs = await getAuditLogs(100); // Fetch last 100 logs
+    const fetchedLogs = await getAuditLogs(100);
     setLogs(fetchedLogs);
     setIsLoading(false);
   };
@@ -155,7 +158,7 @@ export default function AdminLogsPage() {
       </div>
     );
   }
-  
+
   if (currentUserProfile.role !== 'admin' && currentUserProfile.role !== 'superadmin') {
     return (
       <div className="container mx-auto py-8 px-4 md:px-0 text-center">

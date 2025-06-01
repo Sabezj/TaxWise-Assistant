@@ -10,15 +10,14 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, History, Users, ShieldAlert, UserCircle, Settings, BarChart3, ListChecks, UserPlus as CreateGroupIcon } from "lucide-react"; // Renamed UserPlus to avoid conflict
+import { LayoutDashboard, History, Users, ShieldAlert, UserCircle, Settings, BarChart3, ListChecks, UserPlus as CreateGroupIcon } from "lucide-react";
 import { useI18n } from "@/contexts/i18n-context";
 import { useState, useEffect, useCallback } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore"; // Added setDoc, updateDoc
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import type { User as FirebaseUser } from 'firebase/auth';
 import type { UserProfile, UserRole } from "@/types";
 import { Loader2 } from "lucide-react";
-
 
 interface NavItem {
   href: string;
@@ -47,7 +46,7 @@ const SUPERADMIN_EMAIL = "sabezj1@gmail.com";
 interface UserRoleStatus {
   role: UserRole | null;
   isLoading: boolean;
-  fetchUserRole: () => void; 
+  fetchUserRole: () => void;
 }
 
 const useUserRoleStatus = (): UserRoleStatus => {
@@ -60,14 +59,12 @@ const useUserRoleStatus = (): UserRoleStatus => {
       if (currentUser.email === SUPERADMIN_EMAIL) {
         setRole('superadmin');
         setIsLoading(false);
-        // Ensure Firestore profile is also updated if needed, but UI role is immediate
         try {
             const userProfileRef = doc(db, "userProfiles", currentUser.uid);
             const docSnap = await getDoc(userProfileRef);
             if (docSnap.exists() && docSnap.data().role !== 'superadmin') {
                 await updateDoc(userProfileRef, { role: 'superadmin' });
             } else if (!docSnap.exists()) {
-                // This case should ideally be handled by registration, but as a fallback:
                 await setDoc(userProfileRef, {
                     id: currentUser.uid,
                     name: currentUser.displayName || "Super Admin",
@@ -80,9 +77,9 @@ const useUserRoleStatus = (): UserRoleStatus => {
         } catch (error) {
             console.error("Error ensuring superadmin role in Firestore:", error);
         }
-        return; 
+        return;
       }
-      // For other users, fetch role from Firestore
+
       try {
         const userProfileRef = doc(db, "userProfiles", currentUser.uid);
         const docSnap = await getDoc(userProfileRef);
@@ -91,18 +88,17 @@ const useUserRoleStatus = (): UserRoleStatus => {
           setRole(userProfile.role || 'user');
         } else {
           console.warn(`User profile not found in Firestore for UID: ${currentUser.uid}. Defaulting to 'user' role.`);
-          setRole('user'); // Default if profile doesn't exist yet
+          setRole('user');
         }
       } catch (error) {
         console.error("Error fetching user profile for role check:", error);
-        setRole('user'); // Default on error
+        setRole('user');
       }
     } else {
       setRole(null);
     }
     setIsLoading(false);
   }, []);
-
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((fbUser: FirebaseUser | null) => {
@@ -117,10 +113,8 @@ const useUserRoleStatus = (): UserRoleStatus => {
       }
   }, [fetchUserRole]);
 
-
   return { role, isLoading, fetchUserRole: manualRefreshRole };
 };
-
 
 export function AppSidebarNav() {
   const pathname = usePathname();
@@ -143,27 +137,21 @@ export function AppSidebarNav() {
   }
 
   const itemsToDisplay = [...mainNavItems];
-  
+
   if (currentUserRole === 'admin' || currentUserRole === 'superadmin') {
     adminNavItems.forEach(item => {
-        // Superadmin sees all admin items. Regular admin sees items defined for 'admin' role.
         if (item.roles?.includes(currentUserRole)) {
             itemsToDisplay.push(item);
         }
     });
   }
 
-
   return (
     <SidebarMenu>
       {itemsToDisplay.map((item) => {
-        if (item.href === "/dashboard/groups/create" && currentUserRole === 'superadmin') {
-            return null; // Superadmin does not see "Create Group" in sidebar
-        }
-        
-        // Conditional rendering based on roles for admin items
-        if (item.roles && !item.roles.includes(currentUserRole || 'user')) {
-           return null; 
+
+        if (item.roles && (!currentUserRole || !item.roles.includes(currentUserRole))) {
+           return null;
         }
 
         return (

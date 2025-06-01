@@ -48,7 +48,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     if (!currentUser || isLoadingI18nSettings || !isMounted) {
-      if (isMounted && !currentUser) setIsLoadingFinancialData(false); // Not logged in, no data to load
+      if (isMounted && !currentUser) setIsLoadingFinancialData(false);
       return;
     }
 
@@ -65,14 +65,13 @@ export default function AnalyticsPage() {
       } catch (error) {
         console.error("Error loading financial data for analytics from Firestore:", error);
         setFinancialData(getEmptyFinancialData(displayCurrency));
-        // Consider showing a toast error
+
       }
       setIsLoadingFinancialData(false);
     };
 
     loadFinancialData();
   }, [currentUser, displayCurrency, isLoadingI18nSettings, isMounted]);
-
 
   const convertedFinancialData = useMemo(() => {
     if (!financialData || !currencyRates) return null;
@@ -115,7 +114,6 @@ export default function AnalyticsPage() {
     property: { label: t('chartLabels.expenses.property'), color: "hsl(var(--chart-4))" },
   };
 
-
   if (!isMounted || isLoadingFinancialData || isLoadingI18nSettings) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-0 flex items-center justify-center h-[calc(100vh-10rem)]">
@@ -135,10 +133,9 @@ export default function AnalyticsPage() {
       </div>
     );
   }
-  
+
   const eurRate = currencyRates ? (1 / currencyRates.EUR * currencyRates.USD).toFixed(2) : 'N/A';
   const rubRate = currencyRates ? (currencyRates.RUB / currencyRates.USD).toFixed(2) : 'N/A';
-
 
   return (
     <div className="container mx-auto py-8 px-4 md:px-0 space-y-8">
@@ -146,7 +143,7 @@ export default function AnalyticsPage() {
         <h1 className="text-3xl font-bold mb-2 text-foreground">{t('analyticsPage.title')}</h1>
         <p className="text-muted-foreground">{t('analyticsPage.description', { currency: displayCurrency })}</p>
       </div>
-      
+
       <Alert variant="default" className="bg-accent/10 border-accent/30">
         <Info className="h-4 w-4 text-accent" />
         <AlertDescription className="text-accent-foreground/80">
@@ -187,14 +184,14 @@ export default function AnalyticsPage() {
                   <PieChart>
                     <RechartsTooltip
                       cursor={{ fill: 'hsl(var(--muted))' }}
-                      content={<ChartTooltipContent 
+                      content={<ChartTooltipContent
                         formatter={(value, name) => (
                             <div className="flex flex-col">
                                 <span className="text-xs text-muted-foreground">{name}</span>
                                 <span className="font-bold">{formatCurrency(Number(value), displayCurrency)}</span>
                             </div>
                         )}
-                        indicator="dot" 
+                        indicator="dot"
                         hideLabel={true}
                       />}
                     />
@@ -211,7 +208,7 @@ export default function AnalyticsPage() {
                         const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
                         const x = cx + radius * Math.cos(-midAngle * RADIAN);
                         const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                        return ( (percent*100) > 5 ? // Only show label if percent is > 5%
+                        return ( (percent*100) > 5 ?
                           <text x={x} y={y} fill="hsl(var(--primary-foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="10px">
                             {`${(percent * 100).toFixed(0)}%`}
                           </text> : null
@@ -222,7 +219,7 @@ export default function AnalyticsPage() {
                         <Cell key={`cell-${index}`} fill={entry.fill} stroke={entry.fill} />
                       ))}
                     </Pie>
-                     <RechartsLegend 
+                     <RechartsLegend
                         content={({ payload }) => (
                             <div className="flex items-center justify-center gap-x-2 gap-y-1 flex-wrap mt-2">
                             {payload?.map((entry: any, index) => (
@@ -252,6 +249,3 @@ export default function AnalyticsPage() {
     </div>
   );
 }
-
-
-    

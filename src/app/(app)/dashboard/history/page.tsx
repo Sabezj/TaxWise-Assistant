@@ -2,13 +2,8 @@
 "use client";
 
 import { TaxHistoryList } from "@/components/history/tax-history-list";
-// import type { Metadata } from "next"; // Metadata can't be exported from client components
-import { useI18n } from "@/contexts/i18n-context";
 
-// export const metadata: Metadata = {
-//   title: "Tax History - TaxWise Assistant",
-//   description: "View your past tax activities and filings.",
-// };
+import { useI18n } from "@/contexts/i18n-context";
 
 export default function TaxHistoryPage() {
   const { t } = useI18n();

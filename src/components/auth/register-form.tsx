@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword, updateProfile as updateFirebaseAuthProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import type { UserRole } from "@/types"; // Import UserRole
+import type { UserRole } from "@/types";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -58,29 +58,26 @@ export function RegisterForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
-      // Update Firebase Auth profile display name
       await updateFirebaseAuthProfile(user, { displayName: values.name });
 
-      // Create a user profile document in Firestore
       const userProfileRef = doc(db, "userProfiles", user.uid);
       const userRoleToSet: UserRole = values.email === "sabezj1@gmail.com" ? 'superadmin' : 'user';
 
       await setDoc(userProfileRef, {
-        id: user.uid, 
+        id: user.uid,
         name: values.name,
         email: user.email,
         avatarUrl: `https://placehold.co/100x100.png?text=${values.name.charAt(0).toUpperCase() || 'U'}`,
-        role: userRoleToSet, 
+        role: userRoleToSet,
         createdAt: new Date().toISOString(),
       });
-      
-      // Create default settings document in Firestore
+
       const userSettingsRef = doc(db, "userSettings", user.uid);
       await setDoc(userSettingsRef, {
         theme: "system",
         notificationsEnabled: true,
         displayCurrency: "USD",
-        language: "en" 
+        language: "en"
       });
 
       toast({

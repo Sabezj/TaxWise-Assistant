@@ -4,15 +4,14 @@
 import React from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { ChartContainer, ChartTooltipContent, ChartConfig } from "@/components/ui/chart";
-import type { FinancialData } from "@/types"; // MonetaryAmount removed as it's part of FinancialData
+import type { FinancialData } from "@/types";
 import { PackageOpen, Briefcase, TrendingUp as TrendingUpIcon, Landmark, PiggyBank, Home, Users, Activity, Building } from 'lucide-react';
 import { useI18n } from '@/contexts/i18n-context';
 
 interface FinancialSummaryChartProps {
-  financialData: FinancialData | null; // Expects data already converted to display currency
+  financialData: FinancialData | null;
 }
 
-// This config assumes data passed to it is ALREADY CONVERTED to the display currency
 const chartConfigTemplate = (t: Function): ChartConfig => ({
   jobIncome: { label: t('chartLabels.income.job'), color: "hsl(var(--chart-1))", icon: Briefcase },
   investmentsIncome: { label: t('chartLabels.income.investments'), color: "hsl(var(--chart-2))", icon: TrendingUpIcon },
@@ -23,7 +22,6 @@ const chartConfigTemplate = (t: Function): ChartConfig => ({
   socialExpenses: { label: t('chartLabels.expenses.social'), color: "hsl(var(--chart-2))", icon: Users },
   propertyExpenses: { label: t('chartLabels.expenses.property'), color: "hsl(var(--chart-3))", icon: Home },
 });
-
 
 export function FinancialSummaryChart({ financialData }: FinancialSummaryChartProps) {
   const { t, formatCurrency, currency: globalDisplayCurrency } = useI18n();
@@ -50,17 +48,15 @@ export function FinancialSummaryChart({ financialData }: FinancialSummaryChartPr
             <PackageOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">{t('noFinancialDataMessage')}</p>
             <p className="text-sm text-muted-foreground">
-            {t('enterDataToSeeFinancialChartMessage')} 
+            {t('enterDataToSeeFinancialChartMessage')}
             ({t('chartLabels.noDataInSelectedCurrency', { currency: globalDisplayCurrency })})
             </p>
         </div>
     );
   }
-  
+
   const chartData = [];
 
-  // Data is expected to be ALREADY CONVERTED to globalDisplayCurrency by the parent component (AnalyticsPage)
-  // So we don't need to check item.currency here.
   if (financialData?.income) {
     if (financialData.income.job.value > 0) chartData.push({ name: t('chartLabels.income.job').substring(0,10), value: financialData.income.job.value, fill: localizedChartConfig.jobIncome?.color, labelKey: 'jobIncome', type: 'income' });
     if (financialData.income.investments.value > 0) chartData.push({ name: t('chartLabels.income.investments').substring(0,10), value: financialData.income.investments.value, fill: localizedChartConfig.investmentsIncome?.color, labelKey: 'investmentsIncome', type: 'income' });
@@ -73,8 +69,8 @@ export function FinancialSummaryChart({ financialData }: FinancialSummaryChartPr
     if (financialData.expenses.social.value > 0) chartData.push({ name: t('chartLabels.expenses.social').substring(0,10), value: financialData.expenses.social.value, fill: localizedChartConfig.socialExpenses?.color, labelKey: 'socialExpenses', type: 'expense' });
     if (financialData.expenses.property.value > 0) chartData.push({ name: t('chartLabels.expenses.property').substring(0,10), value: financialData.expenses.property.value, fill: localizedChartConfig.propertyExpenses?.color, labelKey: 'propertyExpenses', type: 'expense' });
   }
-  
-  if (chartData.length === 0) { // Should ideally not happen if isEffectivelyEmpty is false, but good fallback
+
+  if (chartData.length === 0) {
      return (
         <div className="flex flex-col items-center justify-center h-60 text-center p-4 border border-dashed rounded-lg">
             <PackageOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -91,23 +87,23 @@ export function FinancialSummaryChart({ financialData }: FinancialSummaryChartPr
         <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis 
-            dataKey="name" 
-            tickLine={false} 
-            axisLine={false} 
+            <XAxis
+            dataKey="name"
+            tickLine={false}
+            axisLine={false}
             tickMargin={8}
             style={{ fontSize: '0.75rem' }}
             />
-            <YAxis 
-            tickFormatter={(value) => formatCurrency(Number(value), globalDisplayCurrency)} 
-            tickLine={false} 
-            axisLine={false} 
+            <YAxis
+            tickFormatter={(value) => formatCurrency(Number(value), globalDisplayCurrency)}
+            tickLine={false}
+            axisLine={false}
             width={80}
             style={{ fontSize: '0.75rem' }}
             />
             <Tooltip
             cursor={{ fill: 'hsl(var(--muted))' }}
-            content={<ChartTooltipContent 
+            content={<ChartTooltipContent
                 formatter={(value, name, props) => {
                     const itemLabelKey = props.payload.labelKey as keyof typeof localizedChartConfig;
                     const Icon = localizedChartConfig[itemLabelKey]?.icon;
@@ -121,16 +117,16 @@ export function FinancialSummaryChart({ financialData }: FinancialSummaryChartPr
                         </div>
                     )
                 }}
-                indicator="dot" 
+                indicator="dot"
             />}
             />
-            <Legend 
+            <Legend
             content={({ payload }) => (
                 <div className="flex items-center justify-center gap-x-3 gap-y-1 flex-wrap mt-4">
                 {payload?.map((entry, index) => {
                     const originalPayloadEntry = chartData.find(d => localizedChartConfig[d.labelKey as keyof typeof localizedChartConfig]?.label === entry.value);
                     const configKey = originalPayloadEntry?.labelKey as keyof typeof localizedChartConfig | undefined;
-                    
+
                     if (!configKey || !localizedChartConfig[configKey]) return null;
                      const Icon = localizedChartConfig[configKey]?.icon;
 

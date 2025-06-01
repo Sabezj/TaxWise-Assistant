@@ -22,7 +22,6 @@ export function AppSidebar() {
   const { t } = useI18n();
   const { toast } = useToast();
 
-
   const handleLogout = async () => {
     try {
       await auth.signOut();
@@ -37,7 +36,7 @@ export function AppSidebar() {
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon">
       <SidebarHeader className="p-4 justify-center items-center">
-        {/* Logo or App Name - visible when expanded */}
+
          <Link href="/dashboard" className="flex items-center font-bold text-xl text-sidebar-foreground group-data-[state=collapsed]:hidden">
            <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -54,7 +53,7 @@ export function AppSidebar() {
           </svg>
           TaxWise
         </Link>
-         {/* Icon - visible when collapsed */}
+
         <Link href="/dashboard" className="hidden items-center group-data-[state=collapsed]:flex">
           <svg
             xmlns="http://www.w3.org/2000/svg"

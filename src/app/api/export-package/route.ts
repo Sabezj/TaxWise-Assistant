@@ -1,28 +1,25 @@
 
-// src/app/api/export-package/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import JSZip from 'jszip';
-import { getBytes, ref as storageRefFirebase, getDownloadURL } from 'firebase/storage'; // getDownloadURL might still be needed for user docs if not pre-signed
-import { storage } from '@/lib/firebase'; // Correctly import storage
+import { getBytes, ref as storageRefFirebase } from 'firebase/storage';
+import { storage } from '@/lib/firebase';
 import type { TaxExportCategory, UserUploadedDocForExport } from '@/types';
 
 interface ExportRequestBody {
   userId: string;
   category: TaxExportCategory;
-  userDocuments: UserUploadedDocForExport[]; // Expecting array of { filename, signedUrl }
+  userDocuments: UserUploadedDocForExport[];
 }
 
-// This map points to the ACTUAL FILENAMES in Firebase Storage
 const sampleDocumentStoragePathMap: Record<TaxExportCategory, string | undefined> = {
   medical: 'app_resources/sample_documents/medical_KND1151156.pdf.pdf',
   educational: 'app_resources/sample_documents/educational_KND1151158.pdf',
   property: 'app_resources/sample_documents/property_KND1150117.pdf',
   social: 'app_resources/sample_documents/social_KND1150130.pdf',
   investments: 'app_resources/sample_documents/investments_KND1150145.pdf',
-  general: undefined, // No specific sample PDF for general, we can add a generic text file
+  general: undefined,
 };
 
-// These are the names that will be used INSIDE the ZIP archive
 const sampleDocumentZipNameMap: Record<TaxExportCategory, string | undefined> = {
   medical: 'sample_medical_KND1151156.pdf',
   educational: 'sample_educational_KND1151158.pdf',
@@ -31,7 +28,6 @@ const sampleDocumentZipNameMap: Record<TaxExportCategory, string | undefined> = 
   investments: 'sample_investments_KND1150145.pdf',
   general: 'sample_general_guide.txt',
 };
-
 
 export async function POST(request: NextRequest) {
   console.log("[API Export] Received POST request to /api/export-package");
@@ -55,7 +51,6 @@ export async function POST(request: NextRequest) {
     let overallSuccess = true;
     let issuesLog = "";
 
-    // 1. Fetch user-uploaded documents using Signed URLs
     if (userDocumentsFolder && userDocuments && Array.isArray(userDocuments) && userDocuments.length > 0) {
       for (const docInfo of userDocuments) {
          if (!docInfo.signedUrl || !docInfo.filename) {
@@ -92,20 +87,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2. Fetch the sample KND PDF from Firebase Storage
     const sampleDocStoragePath = sampleDocumentStoragePathMap[category];
     const zipSampleDocFilename = sampleDocumentZipNameMap[category];
-    
+
     if (sampleDocStoragePath && zipSampleDocFilename && sampleDocumentsFolder) {
       console.log(`[API Export] Attempting to fetch sample document for category '${category}' from Firebase Storage path: ${sampleDocStoragePath}`);
       let sampleDocErrorMessage = "";
       try {
-        // Construct public URL
-        const encodedPath = encodeURIComponent(sampleDocStoragePath);
+        const encodedPath = encodeURIComponent(sampleDocStoragePath).replace(/\./g, '%2E');
         const publicSampleUrl = `https://firebasestorage.googleapis.com/v0/b/${projectId}.appspot.com/o/${encodedPath}?alt=media`;
-        
+
         console.log(`[API Export] Constructed public URL for sample document: ${publicSampleUrl}`);
-        
+
         const sampleDocResponse = await fetch(publicSampleUrl);
         if (!sampleDocResponse.ok) {
           const errorText = await sampleDocResponse.text();
@@ -117,9 +110,9 @@ export async function POST(request: NextRequest) {
       } catch (error: any) {
         sampleDocErrorMessage = `Could not fetch sample document from Firebase Storage: ${sampleDocStoragePath}\nAttempted public URL method.\nError: ${(error as Error).message}\n\nVerify that the file exists at this exact path in your Firebase Storage bucket and that the security rules allow public read access (e.g., 'allow read: if true;' for app_resources/sample_documents path). Check for typos and case sensitivity in the path. Ensure NEXT_PUBLIC_FIREBASE_PROJECT_ID is correctly set on Vercel.`;
         console.error(`[API Export] Error fetching sample document from Firebase Storage path '${sampleDocStoragePath}':`, (error as Error).message);
-        
+
         const diagnosticContent = `${sampleDocErrorMessage}`;
-        
+
         const shortErrorFileName = `ERROR_FETCHING_SAMPLE_${category}.txt`;
         sampleDocumentsFolder.file(shortErrorFileName, diagnosticContent);
         issuesLog += sampleDocErrorMessage;
@@ -135,8 +128,6 @@ export async function POST(request: NextRequest) {
         sampleDocumentsFolder.file(shortInfoFileName, noSampleMessage);
     }
 
-
-    // 3. Add a summary file
     let summaryContent = `TaxWise Export Summary
 User ID: ${userId}
 Category: ${category}
@@ -152,14 +143,13 @@ Sample document Firebase Storage path attempted: ${sampleDocStoragePath || 'None
     zip.file('summary.txt', summaryContent);
     console.log(`[API Export] Added summary.txt to ZIP.`);
 
-    // 4. Generate the ZIP file as a base64 string
     const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
     const base64Zip = zipBuffer.toString('base64');
     const filename = `taxwise_export_${category || 'general'}_${userId.substring(0,8)}_${Date.now()}.zip`;
-    
+
     console.log(`[API Export] Successfully generated ZIP. Filename: ${filename}, Overall Success Status: ${overallSuccess}`);
     return NextResponse.json({
-      success: overallSuccess, // Reflects if all parts were successful
+      success: overallSuccess,
       message: overallSuccess ? `Package for category '${category}' generated successfully.` : `Package for category '${category}' generated with some issues. Please check summary.txt and any error files in the ZIP.`,
       downloadUrl: `data:application/zip;base64,${base64Zip}`,
       filename: filename,
@@ -171,4 +161,3 @@ Sample document Firebase Storage path attempted: ${sampleDocStoragePath || 'None
     return NextResponse.json({ success: false, message: `Server error: ${errorMessage}` }, { status: 500 });
   }
 }
-    

@@ -22,7 +22,6 @@ import React from "react";
 import { Separator } from "@/components/ui/separator";
 import { useI18n } from "@/contexts/i18n-context";
 
-
 const profileFormSchema = (t: Function) => z.object({
   name: z.string().min(2, { message: t("registerForm.validation.nameMin") || "Name must be at least 2 characters." }),
   email: z.string().email({ message: t("registerForm.validation.emailInvalid") || "Invalid email address." }),
@@ -54,7 +53,6 @@ const profileFormSchema = (t: Function) => z.object({
   message: t("profilePage.form.validation.newPasswordMin") || "New password must be at least 6 characters.",
   path: ["newPassword"],
 });
-
 
 type ProfileFormValues = z.infer<ReturnType<typeof profileFormSchema>>;
 
@@ -174,7 +172,7 @@ export function ProfileForm({ user, onUpdateProfile }: ProfileFormProps) {
                 {t("profilePage.form.emailLabel")}
               </FormLabel>
               <FormControl>
-                <Input type="email" placeholder={t("profilePage.form.emailPlaceholder")} {...field} />
+                <Input type="email" placeholder={t("profilePage.form.emailPlaceholder")} {...field} disabled />
               </FormControl>
               <FormDescription>{t("profilePage.form.emailDescription")}</FormDescription>
               <FormMessage />
@@ -242,7 +240,6 @@ export function ProfileForm({ user, onUpdateProfile }: ProfileFormProps) {
             </p>
         </div>
 
-
         <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
           {isSubmitting ? (
             <>
@@ -262,6 +259,3 @@ export function ProfileForm({ user, onUpdateProfile }: ProfileFormProps) {
     </Form>
   );
 }
-
-
-    

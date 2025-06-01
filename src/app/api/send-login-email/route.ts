@@ -11,14 +11,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Email is required and must be a string.' }, { status: 400 });
     }
 
-    // Simulate sending an email
     console.log(`Simulating: Login confirmation email would be sent to: ${email}`);
-    // In a real application, you would integrate an email sending service here.
-    // For example, using Nodemailer, SendGrid, Mailgun, etc.
-
-    // For your testing with sabezj1@gmail.com, you would replace the console.log
-    // with actual email sending code if you had a service configured.
-    // e.g., await sendEmailService.sendLoginConfirmation(email);
 
     return NextResponse.json({ success: true, message: 'Email sending process simulated successfully.' });
   } catch (error) {

@@ -22,7 +22,6 @@ import type { User } from "firebase/auth";
 import { useEffect, useState } from "react";
 import { useI18n } from "@/contexts/i18n-context";
 
-
 export function UserNav() {
   const router = useRouter();
   const { toast } = useToast();
@@ -48,9 +47,8 @@ export function UserNav() {
   };
 
   if (!user) {
-    // Optionally, render a login button or null if user is not authenticated
-    // For this setup, we'll render nothing and assume AppHeader handles this state if needed
-    return null; 
+
+    return null;
   }
 
   return (

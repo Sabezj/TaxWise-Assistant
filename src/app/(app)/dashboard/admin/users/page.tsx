@@ -32,7 +32,6 @@ import {
 } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 
-
 const generateMockLastLogin = () => format(subHours(new Date(), Math.random() * 72), 'yyyy-MM-dd HH:mm aa');
 
 const addUserFormSchema = (t: Function) => z.object({
@@ -74,13 +73,13 @@ const AddUserDialog: React.FC<{
         const groupsQuery = query(collection(db, "groups"), where("adminId", "==", currentUserProfile.id));
         const groupsSnapshot = await getDocs(groupsQuery);
         if (!groupsSnapshot.empty) {
-            primaryGroupId = groupsSnapshot.docs[0].id; 
+            primaryGroupId = groupsSnapshot.docs[0].id;
         } else {
             toast({ title: t("adminUsersPage.toast.groupAdminError.noGroupTitle"), description: t("adminUsersPage.toast.groupAdminError.noGroupDescription"), variant: "destructive"});
             return;
         }
     }
-    
+
     const userDetailsToCreate: AdminCreateUserInput = {
         name: values.name,
         email: values.email,
@@ -89,16 +88,16 @@ const AddUserDialog: React.FC<{
     };
 
     const result = await adminCreateUserAction(
-        currentUserProfile.id, 
-        currentUserProfile.name || currentUserProfile.email, 
-        userDetailsToCreate, 
+        currentUserProfile.id,
+        currentUserProfile.name || currentUserProfile.email || "Unknown User",
+        userDetailsToCreate,
         primaryGroupId
     );
 
     if (result.success) {
       toast({
         title: t("adminUsersPage.toast.userAdded"),
-        description: currentUserProfile.role === 'admin' 
+        description: currentUserProfile.role === 'admin'
             ? t("adminUsersPage.toast.userAddedToGroup", { name: values.name })
             : t("adminUsersPage.toast.userActionSuccessDescription", { name: values.name, action: t("adminUsersPage.toast.userActionSuccess.added") }),
       });
@@ -203,10 +202,9 @@ const AddUserDialog: React.FC<{
   );
 };
 
-
 const UserFormDialog: React.FC<{
   user?: DisplayUser | null;
-  onSave: (user: UserProfile, oldRole?: UserRole) => void; // Pass old role for logging
+  onSave: (user: UserProfile, oldRole?: UserRole) => void;
   trigger: React.ReactNode;
   isEditMode: boolean;
   currentUserRole?: UserRole;
@@ -214,15 +212,15 @@ const UserFormDialog: React.FC<{
   const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState(user?.name || "");
-  const [email, setEmail] = useState(user?.email || ""); 
+  const [email, setEmail] = useState(user?.email || "");
   const [role, setRole] = useState<UserRole>(user?.role || "user");
   const { toast } = useToast();
-  const originalRole = user?.role; // Store original role for logging
+  const originalRole = user?.role;
 
   useEffect(() => {
     if (isOpen) {
       setName(user?.name || "");
-      setEmail(user?.email || ""); 
+      setEmail(user?.email || "");
       setRole(user?.role || "user");
     }
   }, [isOpen, user]);
@@ -233,7 +231,7 @@ const UserFormDialog: React.FC<{
       toast({ title: t("adminUsersPage.toast.validationError"), description: t("adminUsersPage.toast.validationErrorNameEmailEmpty"), variant: "destructive" });
       return;
     }
-    
+
     if (!user || !user.id) {
         toast({ title: t("errors.defaultErrorTitle"), description: "User data is missing for save.", variant: "destructive" });
         return;
@@ -242,12 +240,12 @@ const UserFormDialog: React.FC<{
     const userToSave: UserProfile = {
       id: user.id,
       name,
-      email: user.email, 
+      email: user.email,
       role,
       avatarUrl: user.avatarUrl || `https://placehold.co/100x100.png?text=${name.charAt(0).toUpperCase() || 'U'}`,
       createdAt: user.createdAt || new Date().toISOString(),
     };
-    onSave(userToSave, originalRole); // Pass originalRole
+    onSave(userToSave, originalRole);
     setIsOpen(false);
     toast({
         title: t("adminUsersPage.toast.userUpdated"),
@@ -301,7 +299,6 @@ const UserFormDialog: React.FC<{
   );
 };
 
-
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<DisplayUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -323,11 +320,10 @@ export default function AdminUsersPage() {
           const profile = { id: docSnap.id, ...docSnap.data() } as UserProfile;
           setCurrentUserProfile(profile);
           if (profile.role !== 'admin' && profile.role !== 'superadmin') {
-            router.push('/dashboard'); 
+            router.push('/dashboard');
           }
         } else {
-            // If no profile, they shouldn't be here
-            router.push('/dashboard'); 
+            router.push('/dashboard');
         }
       } else {
         setCurrentUser(null);
@@ -338,7 +334,6 @@ export default function AdminUsersPage() {
     });
     return () => unsubscribe();
   }, [router]);
-
 
   const fetchUsers = useCallback(async () => {
     if (!currentUserProfile) return;
@@ -356,22 +351,21 @@ export default function AdminUsersPage() {
       } else if (currentUserProfile.role === 'admin') {
         const groupsQuery = query(collection(db, "groups"), where("adminId", "==", currentUserProfile.id));
         const groupsSnapshot = await getDocs(groupsQuery);
-        
+
         const groupMemberIds = new Set<string>();
         groupsSnapshot.forEach(groupDoc => {
             const groupData = groupDoc.data() as Group;
             (groupData.memberIds || []).forEach(id => groupMemberIds.add(id));
         });
-        
-        groupMemberIds.add(currentUserProfile.id); 
+
+        groupMemberIds.add(currentUserProfile.id);
 
         const memberIdsArray = Array.from(groupMemberIds);
         if (memberIdsArray.length > 0) {
-            // Firestore 'in' queries are limited to 30 elements per query.
-            const MAX_IDS_PER_QUERY = 30; 
+            const MAX_IDS_PER_QUERY = 30;
             for (let i = 0; i < memberIdsArray.length; i += MAX_IDS_PER_QUERY) {
                 const batchIds = memberIdsArray.slice(i, i + MAX_IDS_PER_QUERY);
-                if (batchIds.length > 0) { // Check if batchIds is not empty
+                if (batchIds.length > 0) {
                     const usersQuery = query(collection(db, "userProfiles"), where("id", "in", batchIds));
                     const usersSnapshot = await getDocs(usersQuery);
                     usersSnapshot.docs.forEach(docSnap => {
@@ -381,7 +375,7 @@ export default function AdminUsersPage() {
             }
         }
       }
-      
+
       const displayUsers = fetchedUserProfiles.map(u => ({...u, lastLogin: generateMockLastLogin()}));
       setUsers(displayUsers);
 
@@ -395,9 +389,9 @@ export default function AdminUsersPage() {
   useEffect(() => {
     if (currentUserProfile && (currentUserProfile.role === 'admin' || currentUserProfile.role === 'superadmin')) {
       fetchUsers();
-    } else if (currentUserProfile) { // User logged in but not admin/superadmin
-      setIsLoading(false); 
-      setUsers([]); // Ensure users list is empty if not authorized
+    } else if (currentUserProfile) {
+      setIsLoading(false);
+      setUsers([]);
     }
   }, [currentUserProfile, fetchUsers]);
 
@@ -416,19 +410,18 @@ export default function AdminUsersPage() {
       await updateDoc(userRef, dataToUpdate);
       if (oldRole && userToSave.role !== oldRole) {
         await logUserAction(
-            currentUserProfile.id, 
-            currentUserProfile.name || currentUserProfile.email, 
-            "User Role Changed by Admin", 
+            currentUserProfile.id,
+            currentUserProfile.name || currentUserProfile.email || "Unknown User",
+            "User Role Changed by Admin",
             `User: ${userToSave.name} (${userToSave.email}), Old Role: ${oldRole}, New Role: ${userToSave.role}`
         );
       }
-      fetchUsers(); 
+      fetchUsers();
     } catch (error) {
       console.error("Error saving user to Firestore: ", error);
       toast({ title: t("adminUsersPage.toast.saveError"), description: (error as Error).message, variant: "destructive" });
     }
   }, [fetchUsers, toast, t, currentUserProfile]);
-
 
   const handleDeleteUser = async (userId: string) => {
     if (!currentUserProfile || currentUserProfile.role !== 'superadmin') {
@@ -447,17 +440,16 @@ export default function AdminUsersPage() {
 
     if (confirm(t("adminUsersPage.deleteConfirmMessage", { name: userToDelete?.name || userId }))) {
       try {
-        // Note: Actual deletion from Firebase Auth requires Admin SDK or re-authentication.
-        // This action will only remove user data from Firestore and associated collections.
+
         console.log(`Conceptual: Would delete user ${userId} from Firebase Auth if Admin SDK was used.`);
 
         const batch = writeBatch(db);
-        
+
         batch.delete(doc(db, "userProfiles", userId));
         batch.delete(doc(db, "userSettings", userId));
         batch.delete(doc(db, "userFinancialData", userId));
         batch.delete(doc(db, "userDocumentMetadata", userId));
-        
+
         const groupsMemberQuery = query(collection(db, "groups"), where("memberIds", "array-contains", userId));
         const memberGroupsSnapshot = await getDocs(groupsMemberQuery);
         memberGroupsSnapshot.forEach(groupDoc => {
@@ -471,16 +463,15 @@ export default function AdminUsersPage() {
         adminGroupsSnapshot.forEach(groupDoc => {
           batch.delete(doc(db, "groups", groupDoc.id));
         });
-        
-        // TODO: Delete user's files from Firebase Storage (requires Admin SDK or a Cloud Function)
+
         console.log(`Conceptual: Would delete files for user ${userId} from Firebase Storage.`);
 
         await batch.commit();
-        
+
         await logUserAction(
-            currentUserProfile.id, 
-            currentUserProfile.name || currentUserProfile.email, 
-            "User Deleted by Admin", 
+            currentUserProfile.id,
+            currentUserProfile.name || currentUserProfile.email || "Unknown User",
+            "User Deleted by Admin",
             `Deleted User: ${userToDelete?.name || "Unknown"} (${userToDelete?.email || userId})`
         );
 
@@ -504,7 +495,7 @@ export default function AdminUsersPage() {
     user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     getRoleDisplayName(user.role).toLowerCase().includes(searchTerm.toLowerCase())
   );
-  
+
   const roleIcons: Record<UserRole, React.ElementType> = {
     user: UserIconLucide,
     admin: ShieldCheck,
@@ -518,7 +509,7 @@ export default function AdminUsersPage() {
       </div>
     );
   }
-  
+
   if (currentUserProfile.role !== 'admin' && currentUserProfile.role !== 'superadmin') {
     return (
       <div className="container mx-auto py-8 px-4 md:px-0 text-center">
@@ -543,8 +534,8 @@ export default function AdminUsersPage() {
                 />
             </div>
             {(currentUserProfile.role === 'admin' || currentUserProfile.role === 'superadmin') && (
-                 <AddUserDialog 
-                    onUserAdded={fetchUsers} 
+                 <AddUserDialog
+                    onUserAdded={fetchUsers}
                     currentUserProfile={currentUserProfile}
                     trigger={
                         <Button>
@@ -575,8 +566,8 @@ export default function AdminUsersPage() {
             <p className="text-muted-foreground text-center py-4">{t("adminUsersPage.emptyFilter.message", { searchTerm })}</p>
           ) : filteredUsers.length === 0 ? (
              <p className="text-muted-foreground text-center py-4">
-                {currentUserProfile.role === 'admin' 
-                    ? t("adminUsersPage.empty.groupAdminMessage") 
+                {currentUserProfile.role === 'admin'
+                    ? t("adminUsersPage.empty.groupAdminMessage")
                     : t("adminUsersPage.empty.superAdminMessage")}
             </p>
           ) : (
@@ -593,11 +584,11 @@ export default function AdminUsersPage() {
               <TableBody>
                 {filteredUsers.map((user) => {
                   const RoleIcon = roleIcons[user.role] || UserIconLucide;
-                  const canEdit = currentUserProfile.role === 'superadmin' && 
+                  const canEdit = currentUserProfile.role === 'superadmin' &&
                                   !(user.email === 'sabezj1@gmail.com' && currentUserProfile.email !== 'sabezj1@gmail.com');
 
-                  const canDelete = currentUserProfile.role === 'superadmin' && 
-                                    user.id !== currentUserProfile.id && 
+                  const canDelete = currentUserProfile.role === 'superadmin' &&
+                                    user.id !== currentUserProfile.id &&
                                     user.email !== "sabezj1@gmail.com";
 
                   return (
@@ -607,7 +598,7 @@ export default function AdminUsersPage() {
                       <TableCell>
                         <Badge variant={user.role === "superadmin" ? "default" : user.role === "admin" ? "secondary" : "outline"}
                                className={cn(
-                                user.role === 'superadmin' ? 'bg-primary text-primary-foreground' : 
+                                user.role === 'superadmin' ? 'bg-primary text-primary-foreground' :
                                 user.role === 'admin' ? 'bg-accent text-accent-foreground' : ''
                                )}
                         >
@@ -623,7 +614,7 @@ export default function AdminUsersPage() {
                             isEditMode={true}
                             currentUserRole={currentUserProfile?.role}
                             trigger={
-                                <Button variant="outline" size="icon" className="h-8 w-8" title={t("adminUsersPage.actions.editUserTitle")} 
+                                <Button variant="outline" size="icon" className="h-8 w-8" title={t("adminUsersPage.actions.editUserTitle")}
                                 disabled={!canEdit}>
                                     <Edit3 className="h-4 w-4" />
                                 </Button>
@@ -645,4 +636,3 @@ export default function AdminUsersPage() {
     </div>
   );
 }
-

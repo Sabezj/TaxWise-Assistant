@@ -6,9 +6,9 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signInWithEmailAndPassword, type User } from "firebase/auth"; // Import User type
+import { signInWithEmailAndPassword, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { logUserAction } from "@/lib/actions"; // Import logUserAction
+import { logUserAction } from "@/lib/actions";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +26,7 @@ import { LogIn } from "lucide-react";
 import { useI18n } from "@/contexts/i18n-context";
 
 const formSchema = (t: Function) => z.object({
-  email: z.string().email({ message: t("registerForm.validation.emailInvalid") }), 
+  email: z.string().email({ message: t("registerForm.validation.emailInvalid") }),
   password: z.string().min(6, { message: t("registerForm.validation.passwordMin") }),
 });
 
@@ -48,13 +48,12 @@ export function LoginForm() {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
-      
+
       toast({
         title: t("loginForm.successToastTitle"),
-        description: t("loginForm.successToastDescription"), 
+        description: t("loginForm.successToastDescription"),
       });
 
-      // Log login action
       if (user) {
         await logUserAction(
           user.uid,
@@ -63,16 +62,15 @@ export function LoginForm() {
         );
       }
 
-      // Simulate sending an email via API route
       try {
-        const emailResponse = await fetch('/api/send-login-email', { 
-          method: 'POST', 
+        const emailResponse = await fetch('/api/send-login-email', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: values.email }) 
+          body: JSON.stringify({ email: values.email })
         });
         const emailResult = await emailResponse.json();
         if (emailResult.success) {
-          // console.log("Login email simulation API call successful:", emailResult.message);
+
         } else {
           console.error("Login email simulation API call failed:", emailResult.message);
         }
@@ -89,7 +87,7 @@ export function LoginForm() {
          switch(error.code) {
             case "auth/user-not-found":
             case "auth/wrong-password":
-            case "auth/invalid-credential": // Added this case
+            case "auth/invalid-credential":
                 errorMessageKey = "loginForm.error.invalidCredentials";
                 break;
             case "auth/too-many-requests":
@@ -156,7 +154,7 @@ export function LoginForm() {
         </Form>
       </CardContent>
       <CardFooter className="flex flex-col items-center space-y-2">
-        <Link href="/forgot-password"> 
+        <Link href="/forgot-password">
           <Button variant="link" className="text-sm">{t("loginForm.forgotPasswordLink")}</Button>
         </Link>
         <p className="text-sm text-muted-foreground">

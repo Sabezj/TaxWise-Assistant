@@ -25,11 +25,8 @@ import { auth } from "@/lib/firebase";
 import { useEffect, useState } from "react";
 import type { User } from "firebase/auth";
 
-// This page is no longer used. Group creation is now initiated from the profile page.
-// Keeping the file for now in case it's needed as a reference, but it should be deleted.
-
 const createGroupFormSchema = (t: Function) => z.object({
-  name: z.string().min(3, { message: t("profilePage.createGroupDialog.namePlaceholder") }), // Using existing key
+  name: z.string().min(3, { message: t("profilePage.createGroupDialog.namePlaceholder") }),
 });
 
 type CreateGroupFormValues = z.infer<ReturnType<typeof createGroupFormSchema>>;
@@ -46,7 +43,7 @@ export default function CreateGroupPage_DEPRECATED() {
       setCurrentUser(user);
       setIsLoadingUser(false);
       if (!user) {
-        router.push('/login'); 
+        router.push('/login');
       }
     });
     return () => unsubscribe();
@@ -78,7 +75,7 @@ export default function CreateGroupPage_DEPRECATED() {
         title: t("groupsPage.create.toast.successTitle"),
         description: t("groupsPage.create.toast.successDescription", { name: result.group.name }),
       });
-      router.push("/dashboard/admin/users"); 
+      router.push("/dashboard/admin/users");
     }
   }
 
@@ -98,14 +95,13 @@ export default function CreateGroupPage_DEPRECATED() {
     );
   }
 
-
   return (
     <div className="container mx-auto py-8 px-4 md:px-0">
       <Card className="max-w-2xl mx-auto shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center text-2xl">
             <Users2 className="mr-3 h-7 w-7 text-primary" />
-            DEPRECATED: {t("groupsPage.create.title")} 
+            DEPRECATED: {t("groupsPage.create.title")}
           </CardTitle>
           <CardDescription>
             This page is no longer in use. Group creation is handled via the profile page.

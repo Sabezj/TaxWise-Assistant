@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from "react"; // Removed useState, useCallback as they are managed by parent
+import React from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,11 +12,11 @@ import { useI18n } from "@/contexts/i18n-context";
 
 interface DocumentUploadProps {
   uploadedDocuments: UploadedDocument[];
-  onNewFiles: (files: File[]) => Promise<void>; // Changed from onDocumentsChange
+  onNewFiles: (files: File[]) => Promise<void>;
   onRemoveDocument: (document: UploadedDocument) => Promise<void>;
   isUploading: boolean;
   maxFiles?: number;
-  maxSize?: number; // in bytes
+  maxSize?: number;
 }
 
 export function DocumentUpload({
@@ -25,7 +25,7 @@ export function DocumentUpload({
   onRemoveDocument,
   isUploading,
   maxFiles = 10,
-  maxSize = 5 * 1024 * 1024, // 5MB default
+  maxSize = 5 * 1024 * 1024,
 }: DocumentUploadProps) {
   const { toast } = useToast();
   const { t } = useI18n();
@@ -60,7 +60,7 @@ export function DocumentUpload({
             description: t("dashboard.documentUpload.toast.fileLimitReachedDescription", { maxFiles }),
             variant: "destructive",
           });
-          // Only take enough files to not exceed maxFiles
+
           const filesToUpload = acceptedFiles.slice(0, maxFiles - uploadedDocuments.length);
           if (filesToUpload.length > 0) {
             onNewFiles(filesToUpload);
@@ -86,7 +86,7 @@ export function DocumentUpload({
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
     },
     maxSize,
-    // maxFiles validation is now handled manually in onDrop to give better feedback for partial uploads
+
     disabled: uploadedDocuments.length >= maxFiles || isUploading,
   });
 

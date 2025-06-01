@@ -5,8 +5,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import enTranslations from '@/locales/en.json';
 import ruTranslations from '@/locales/ru.json';
 import type { Currency, MonetaryAmount, CurrencyRates, UserSettings } from '@/types';
-import { doc, getDoc } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase"; // Import auth
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
 import type { User } from "firebase/auth";
 
 type Translations = Record<string, string>;
@@ -20,8 +20,8 @@ export const AvailableCurrencies: Record<string, Currency> = {
 
 const MOCK_RATES: CurrencyRates = {
   USD: 1,
-  EUR: 0.93, 
-  RUB: 92.5, 
+  EUR: 0.93,
+  RUB: 92.5,
 };
 
 interface I18nContextType {
@@ -55,7 +55,7 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(user => {
       setCurrentUser(user);
-      // Trigger settings load/reload when auth state changes
+
     });
     return () => unsubscribe();
   }, []);
@@ -75,7 +75,7 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
             userLang = firestoreSettings.language || 'en';
             userCurrency = firestoreSettings.displayCurrency || 'USD';
           } else {
-            // Fallback to localStorage if no Firestore settings for this user
+
             const storedLang = localStorage.getItem('app-language') as Language | null;
             if (storedLang && (storedLang === 'en' || storedLang === 'ru')) {
               userLang = storedLang;
@@ -87,17 +87,17 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
             if (storedCurrency && Object.values(AvailableCurrencies).includes(storedCurrency)) {
               userCurrency = storedCurrency;
             }
-             // Optionally save default settings to Firestore if they don't exist for this user
-            await setDoc(settingsRef, { 
-                theme: "system", 
-                notificationsEnabled: true, 
-                displayCurrency: userCurrency, 
-                language: userLang 
+
+            await setDoc(settingsRef, {
+                theme: "system",
+                notificationsEnabled: true,
+                displayCurrency: userCurrency,
+                language: userLang
             });
           }
         } catch (error) {
           console.warn("Failed to load settings from Firestore, falling back to localStorage/defaults:", error);
-          // Fallback to localStorage on Firestore error
+
           const storedLang = localStorage.getItem('app-language') as Language | null;
           if (storedLang && (storedLang === 'en' || storedLang === 'ru')) {
             userLang = storedLang;
@@ -110,7 +110,7 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
             userCurrency = storedCurrency;
           }
         }
-      } else { // No user logged in, use localStorage/browser defaults
+      } else {
           const storedLang = localStorage.getItem('app-language') as Language | null;
           if (storedLang && (storedLang === 'en' || storedLang === 'ru')) {
             userLang = storedLang;
@@ -123,24 +123,24 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
             userCurrency = storedCurrency;
           }
       }
-      
+
       setLanguageState(userLang);
       setTranslationsState(loadedTranslations[userLang] || loadedTranslations.en);
       setCurrencyState(userCurrency);
-      
-      setCurrencyRatesState(MOCK_RATES); 
+
+      setCurrencyRatesState(MOCK_RATES);
       setIsLoadingSettings(false);
     };
 
     loadInitialSettings();
-  }, [currentUser]); // Reload settings if currentUser changes
+  }, [currentUser]);
 
   const setLanguage = useCallback((lang: Language) => {
     if (lang === 'en' || lang === 'ru') {
       setLanguageState(lang);
       setTranslationsState(loadedTranslations[lang]);
-      localStorage.setItem('app-language', lang); 
-      // Saving to Firestore is handled by the Settings page
+      localStorage.setItem('app-language', lang);
+
     }
   }, []);
 
@@ -148,7 +148,7 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
     if (Object.values(AvailableCurrencies).includes(curr)) {
       setCurrencyState(curr);
       localStorage.setItem('app-currency', curr);
-      // Saving to Firestore is handled by the Settings page
+
     }
   }, []);
 
@@ -165,7 +165,7 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
   const formatCurrency = useCallback((value: number, targetCurrencyParam?: Currency): string => {
     const effectiveCurrency = targetCurrencyParam || currency;
     const effectiveLanguage = language || 'en';
-    
+
     try {
       return new Intl.NumberFormat(effectiveLanguage, {
         style: 'currency',

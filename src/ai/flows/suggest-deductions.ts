@@ -1,14 +1,5 @@
-// This file holds the Genkit flow for suggesting potential tax deductions to the user.
 
 'use server';
-
-/**
- * @fileOverview An AI agent to suggest possible tax deductions based on user-provided data and documents.
- *
- * - suggestDeductions - A function that handles the tax deduction suggestion process.
- * - SuggestDeductionsInput - The input type for the suggestDeductions function.
- * - SuggestDeductionsOutput - The return type for the suggestDeductions function.
- */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
@@ -73,8 +64,7 @@ const suggestDeductionsFlow = ai.defineFlow(
   async input => {
     const {output} = await prompt(input);
     if (!output) {
-      // Handle cases where the LLM might return a non-parseable or empty response
-      // This is a fallback, ideally the model respects the output schema.
+
       console.error("LLM did not return valid output for suggestDeductionsFlow");
       return {
         suggestedDeductions: ["Error: AI failed to generate suggestions. Please check logs."],
@@ -84,4 +74,3 @@ const suggestDeductionsFlow = ai.defineFlow(
     return output;
   }
 );
-
