@@ -74,7 +74,7 @@ export async function exportUserDocuments(
   userDocuments: UserUploadedDocForExport[]
 ): Promise<{ downloadUrl?: string; filename?: string; error?: string; message?: string }> {
 
-  const apiUrl = process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/api/export-package` : `/api/export-package`;
+  const apiUrl = `/api/export-package`;
   console.log(`[Action] Initiating export via API: ${apiUrl} for user: ${userId}, Category: ${category}`);
 
   try {
@@ -127,11 +127,11 @@ export async function createGroupAction(input: CreateGroupInput): Promise<{ grou
 
     const userProfileRef = doc(db, "userProfiles", input.creatorId);
     const userProfileSnap = await getDoc(userProfileRef);
-    let userName = "Unknown User";
+    let userNameForLog = "Unknown User";
 
     if (userProfileSnap.exists()) {
       const userProfileData = userProfileSnap.data() as UserProfile;
-      userName = userProfileData.name || userProfileData.email || "User";
+      userNameForLog = userProfileData.name || userProfileData.email || "User";
       if (userProfileData.role === 'user') {
         await updateDoc(userProfileRef, { role: 'admin' as UserRole });
       }
@@ -139,7 +139,7 @@ export async function createGroupAction(input: CreateGroupInput): Promise<{ grou
         console.warn(`User profile ${input.creatorId} not found during group creation role update.`);
     }
 
-    await logUserAction(input.creatorId, userName, "Group Created", `Group Name: ${input.name}, Group ID: ${newGroupDocRef.id}`);
+    await logUserAction(input.creatorId, userNameForLog, "Group Created", `Group Name: ${input.name}, Group ID: ${newGroupDocRef.id}`);
     return { group: newGroup };
   } catch (error) {
     console.error("Error creating group:", error);
